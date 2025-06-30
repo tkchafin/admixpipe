@@ -8,6 +8,7 @@ include { ADMIXTUREPIPELINE } from '../../modules/local/admixpipe/admixturepipel
 include { CLUMPAK } from '../../modules/local/admixpipe/submitclumpak.nf'
 include { CVSUM } from '../../modules/local/admixpipe/cvsum.nf'
 include { DISTRUCT } from '../../modules/local/admixpipe/distructrerun.nf'
+include { EVALADMIX } from '../../modules/local/admixpipe/evaladmix.nf'
 include { BESTK } from '../../modules/local/bestK.nf'
 
 workflow RUN_ADMIXPIPE {
@@ -66,6 +67,21 @@ workflow RUN_ADMIXPIPE {
         DISTRUCT.out.loglik
     )
     ch_versions = ch_versions.mix( CVSUM.out.versions )
+
+    // Run EvalAdmix
+    EVALADMIX(
+        ADMIXTUREPIPELINE.out.ped,
+        ADMIXTUREPIPELINE.out.map,
+        ADMIXTUREPIPELINE.out.pfiles,
+        ADMIXTUREPIPELINE.out.qfiles,
+        ADMIXTUREPIPELINE.out.qfiles_json,
+        ch_popmap,
+        CLUMPAK.out.output,
+        DISTRUCT.out.major_clusters,
+        DISTRUCT.out.cvruns_json,
+        DISTRUCT.out.qfilepaths_json
+    )
+    ch_versions = ch_versions.mix( EVALADMIX.out.versions )
 
     // Fetch results for the best K value
     BESTK(

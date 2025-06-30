@@ -38,6 +38,8 @@ process ADMIXTUREPIPELINE {
         -K ${maxk} \\
         -C 1.0 \\
         -S 0.0 \\
+        -c ${params.num_cv} \\
+        -R ${params.num_reps}
         ${args}
 
     cat <<-END_VERSIONS > versions.yml

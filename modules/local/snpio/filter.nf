@@ -26,6 +26,7 @@ process SNPIO_FILTER {
         --min_maf ${params.min_maf} \\
         --snp_cov ${params.snp_cov} \\
         --ind_cov ${params.ind_cov} \\
+        --flank_dist ${params.thin_dist} \\
         ${args}
 
     cat <<-END_VERSIONS > versions.yml

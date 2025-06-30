@@ -33,6 +33,12 @@ def main():
         help="Maximum MAF to retain a SNP (default: 0.05)",
     )
     parser.add_argument(
+        "--flank_dist",
+        type=int,
+        default=75,
+        help="Maximum allowed distance between SNPs (default: 75)",
+    )
+    parser.add_argument(
         "--snp_cov",
         type=float,
         default=0.9,
@@ -63,6 +69,7 @@ def main():
     gd_filt = (
         nrm.filter_missing_sample(args.ind_cov)
         .filter_monomorphic(exclude_heterozygous=False)
+        .thin_loci(remove_all=True, size=args.flank_dist)
         .filter_missing(args.snp_cov)
         .filter_maf(args.min_maf)
         .resolve()
