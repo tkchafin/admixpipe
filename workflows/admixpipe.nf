@@ -4,12 +4,16 @@
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 
-include { FASTQC                 } from '../modules/nf-core/fastqc/main'
 include { MULTIQC                } from '../modules/nf-core/multiqc/main'
 include { paramsSummaryMap       } from 'plugin/nf-validation'
 include { paramsSummaryMultiqc   } from '../subworkflows/nf-core/utils_nfcore_pipeline'
 include { softwareVersionsToYAML } from '../subworkflows/nf-core/utils_nfcore_pipeline'
 include { methodsDescriptionText } from '../subworkflows/local/utils_nfcore_admixpipe_pipeline'
+
+include { SNPIO_FILTER } from '../modules/local/snpio/filter.nf'
+include { RUN_ADMIXPIPE } from '../subworkflows/local/run_admixpipe.nf'
+include { GENERATE_REPORT } from '../subworkflows/local/generate_report.nf'
+include { CUSTOMIZE_REPORT } from '../modules/local/report/customize_report.nf'
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -20,7 +24,9 @@ include { methodsDescriptionText } from '../subworkflows/local/utils_nfcore_admi
 workflow ADMIXPIPE {
 
     take:
-    ch_samplesheet // channel: samplesheet read in from --input
+    ch_vcf     // [meta, vcf]
+    ch_tbi     // [meta, tbi]
+    ch_popmap  // [meta, popmap]
 
     main:
 
@@ -28,13 +34,54 @@ workflow ADMIXPIPE {
     ch_multiqc_files = Channel.empty()
 
     //
-    // MODULE: Run FastQC
+    // VCF pre-processing
     //
-    FASTQC (
-        ch_samplesheet
+    // This step removes individuals with a large amount of missing data,
+    // flanking variation within ${params.primer_length} distance, low variation,
+    // and generates SNPio missingness reports
+    SNPIO_FILTER(
+        ch_vcf,
+        ch_tbi,
+        ch_popmap
     )
-    ch_multiqc_files = ch_multiqc_files.mix(FASTQC.out.zip.collect{it[1]})
-    ch_versions = ch_versions.mix(FASTQC.out.versions.first())
+    ch_versions = ch_versions.mix(SNPIO_FILTER.out.versions)
+    ch_filtered_vcf = SNPIO_FILTER.out.filtered_vcf.map { meta, file -> tuple(meta + [id: "${meta.id}_filtered"], file) }
+    ch_filtered_tbi = SNPIO_FILTER.out.filtered_tbi.map { meta, file -> tuple(meta + [id: "${meta.id}_filtered"], file) }
+    ch_snpio_output = SNPIO_FILTER.out.snpio_output.map { meta, dir -> tuple(meta + [id: "${meta.id}_filtered"], dir) }
+
+    //
+    // Run admixture pipeline on filtered dataset
+    //
+    RUN_ADMIXPIPE(
+        ch_filtered_vcf,
+        ch_popmap
+    )
+    ch_versions = ch_versions.mix(RUN_ADMIXPIPE.out.versions)
+
+
+    // //
+    // // Generate figures for the report
+    // //
+    // GENERATE_REPORT(
+    //     ch_vcf,
+    //     ch_tbi,
+    //     ch_filtered_vcf,
+    //     ch_filtered_tbi,
+    //     ch_selected_vcf,
+    //     ch_selected_tbi,
+    //     ADMIXPIPE_PRE.out.cv_file,
+    //     ch_snpio_output,
+    //     ch_selected_snpio_output,
+    //     ADMIXPIPE_PRE.out.bestK_clumpp,
+    //     ADMIXPIPE_POST.out.bestK_clumpp,
+    //     ADMIXPIPE_POST.out.inds,
+    //     ADMIXPIPE_POST.out.pops,
+    //     SELECT_CANDIDATES.out.metrics,
+    //     SELECT_CANDIDATES.out.top_loci
+    // )
+    // ch_versions = ch_versions.mix( GENERATE_REPORT.out.versions )
+    // ch_multiqc_files = ch_multiqc_files.mix( GENERATE_REPORT.out.mqc_files )
+
 
     //
     // Collate and save software versions

@@ -19,19 +19,6 @@ include { ADMIXPIPE  } from './workflows/admixpipe'
 include { PIPELINE_INITIALISATION } from './subworkflows/local/utils_nfcore_admixpipe_pipeline'
 include { PIPELINE_COMPLETION     } from './subworkflows/local/utils_nfcore_admixpipe_pipeline'
 
-include { getGenomeAttribute      } from './subworkflows/local/utils_nfcore_admixpipe_pipeline'
-
-/*
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    GENOME PARAMETER VALUES
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-*/
-
-// TODO nf-core: Remove this line if you don't need a FASTA file
-//   This is an example of how to use getGenomeAttribute() to fetch parameters
-//   from igenomes.config using `--genome`
-params.fasta = getGenomeAttribute('fasta')
-
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     NAMED WORKFLOWS FOR PIPELINE
@@ -44,7 +31,9 @@ params.fasta = getGenomeAttribute('fasta')
 workflow ACAMEL_ADMIXPIPE {
 
     take:
-    samplesheet // channel: samplesheet read in from --input
+    vcf     // channel: vcf read in from --input
+    tbi     // channel: vcf index
+    popmap  // channel: population map
 
     main:
 
@@ -52,7 +41,9 @@ workflow ACAMEL_ADMIXPIPE {
     // WORKFLOW: Run pipeline
     //
     ADMIXPIPE (
-        samplesheet
+        vcf,
+        tbi,
+        popmap
     )
 
     emit:
@@ -79,14 +70,18 @@ workflow {
         params.monochrome_logs,
         args,
         params.outdir,
-        params.input
+        params.input,
+        params.popmap,
+        params.reference
     )
 
     //
     // WORKFLOW: Run main workflow
     //
     ACAMEL_ADMIXPIPE (
-        PIPELINE_INITIALISATION.out.samplesheet
+        PIPELINE_INITIALISATION.out.vcf,
+        PIPELINE_INITIALISATION.out.tbi,
+        PIPELINE_INITIALISATION.out.popmap
     )
 
     //
