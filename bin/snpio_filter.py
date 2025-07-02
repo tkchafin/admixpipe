@@ -27,6 +27,12 @@ def main():
         help="Maximum allowed missingness per individual (default: 0.75)",
     )
     parser.add_argument(
+        "--pop_cov",
+        type=float,
+        default=0.75,
+        help="Maximum allowed missingness per population to retain a SNP (default: 0.75)",
+    )
+    parser.add_argument(
         "--min_maf",
         type=float,
         default=0.05,
@@ -67,10 +73,11 @@ def main():
     # Filter VCF
     nrm = NRemover2(gd)
     gd_filt = (
-        nrm.filter_missing_sample(args.ind_cov)
+        nrm.filter_missing_pop(args.pop_cov)
         .filter_monomorphic(exclude_heterozygous=False)
         .thin_loci(remove_all=True, size=args.flank_dist)
         .filter_missing(args.snp_cov)
+        .filter_missing_sample(args.ind_cov)
         .filter_maf(args.min_maf)
         .resolve()
     )

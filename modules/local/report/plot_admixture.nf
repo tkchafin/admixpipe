@@ -5,9 +5,11 @@ process PLOT_ADMIXTURE {
     container "docker.io/tkchafin/plotly:1.1"
 
     input:
-        tuple val(meta), path(clumppfile), path(inds), path(pops)
+        tuple val(meta), path(clumppfile)
+        tuple val(meta2), path(inds)
+        tuple val(meta3), path(pops)
     output:
-        path("admixture_${meta.id}_mqc.html"), emit: admixture_html
+        path("admixture_bestk_mqc.html"), emit: admixture_html
         path("versions.yml")   , emit: versions
 
     script:
@@ -17,8 +19,8 @@ process PLOT_ADMIXTURE {
         --clumpp ${clumppfile} \\
         --inds ${inds} \\
         --pops ${pops} \\
-        --template ${baseDir}/assets/multiqc_admixture_${meta.id}.html \\
-        --out "admixture_${meta.id}_mqc.html" \\
+        --template ${baseDir}/assets/multiqc_admixture_bestk.html \\
+        --out "admixture_bestk_mqc.html" \\
         ${args}
 
     plotly_version=\$(python3 -c 'import plotly; print(plotly.__version__)')

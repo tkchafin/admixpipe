@@ -37,8 +37,8 @@ workflow ADMIXPIPE {
     // VCF pre-processing
     //
     // This step removes individuals with a large amount of missing data,
-    // flanking variation within ${params.primer_length} distance, low variation,
-    // and generates SNPio missingness reports
+    // flanking variants, low variation, etc...
+    // and also generates SNPio missingness reports
     SNPIO_FILTER(
         ch_vcf,
         ch_tbi,
@@ -59,28 +59,22 @@ workflow ADMIXPIPE {
     ch_versions = ch_versions.mix(RUN_ADMIXPIPE.out.versions)
 
 
-    // //
-    // // Generate figures for the report
-    // //
-    // GENERATE_REPORT(
-    //     ch_vcf,
-    //     ch_tbi,
-    //     ch_filtered_vcf,
-    //     ch_filtered_tbi,
-    //     ch_selected_vcf,
-    //     ch_selected_tbi,
-    //     ADMIXPIPE_PRE.out.cv_file,
-    //     ch_snpio_output,
-    //     ch_selected_snpio_output,
-    //     ADMIXPIPE_PRE.out.bestK_clumpp,
-    //     ADMIXPIPE_POST.out.bestK_clumpp,
-    //     ADMIXPIPE_POST.out.inds,
-    //     ADMIXPIPE_POST.out.pops,
-    //     SELECT_CANDIDATES.out.metrics,
-    //     SELECT_CANDIDATES.out.top_loci
-    // )
-    // ch_versions = ch_versions.mix( GENERATE_REPORT.out.versions )
-    // ch_multiqc_files = ch_multiqc_files.mix( GENERATE_REPORT.out.mqc_files )
+    //
+    // Generate figures for the report
+    //
+    GENERATE_REPORT(
+        ch_vcf,
+        ch_tbi,
+        ch_filtered_vcf,
+        ch_filtered_tbi,
+        RUN_ADMIXPIPE.out.cv_file,
+        ch_snpio_output,
+        RUN_ADMIXPIPE.out.bestK_clumpp,
+        RUN_ADMIXPIPE.out.inds,
+        RUN_ADMIXPIPE.out.pops,
+    )
+    ch_versions = ch_versions.mix( GENERATE_REPORT.out.versions )
+    ch_multiqc_files = ch_multiqc_files.mix( GENERATE_REPORT.out.mqc_files )
 
 
     //
@@ -132,6 +126,9 @@ workflow ADMIXPIPE {
         ch_multiqc_custom_config.toList(),
         ch_multiqc_logo.toList()
     )
+
+    // Customize report
+    CUSTOMIZE_REPORT( MULTIQC.out.report )
 
     emit:
     multiqc_report = MULTIQC.out.report.toList() // channel: /path/to/multiqc_report.html
