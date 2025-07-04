@@ -70,6 +70,7 @@ workflow ADMIXPIPE {
         RUN_ADMIXPIPE.out.cv_file,
         RUN_ADMIXPIPE.out.evanno,
         RUN_ADMIXPIPE.out.bestK_file,
+        RUN_ADMIXPIPE.out.best_results,
         ch_snpio_output,
         RUN_ADMIXPIPE.out.bestK_clumpp,
         RUN_ADMIXPIPE.out.inds,

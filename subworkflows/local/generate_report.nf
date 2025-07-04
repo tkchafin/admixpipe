@@ -2,6 +2,7 @@ include { PLOT_CV } from '../../modules/local/report/plot_cv.nf'
 include { PLOT_EVANNO } from '../../modules/local/report/plot_evanno.nf'
 include { SAMPLE_SUMMARY } from '../../modules/local/report/sample_summary.nf'
 include { PLOT_ADMIXTURE } from '../../modules/local/report/plot_admixture.nf'
+include { PLOT_ADMIXTURE_ALL } from '../../modules/local/report/plot_admixture_all.nf'
 include { FILTER_SUMMARY } from '../../modules/local/report/filter_summary.nf'
 include { BCFTOOLS_QUERY as BCFTOOLS_QUERY_PRE } from '../../modules/local/bcftools_query.nf'
 include { BCFTOOLS_QUERY as BCFTOOLS_QUERY_POST } from '../../modules/local/bcftools_query.nf'
@@ -16,6 +17,7 @@ workflow GENERATE_REPORT {
     cv_file
     evanno
     bestk_file
+    best_results
     snpio_pre
     clumpp
     inds
@@ -58,6 +60,17 @@ workflow GENERATE_REPORT {
     )
     ch_mqc_files = ch_mqc_files.mix( PLOT_ADMIXTURE.out.admixture_html )
     ch_versions = ch_versions.mix( PLOT_ADMIXTURE.out.versions )
+
+    //Admixture barplots -- all
+    PLOT_ADMIXTURE_ALL(
+        best_results,
+        inds,
+        pops,
+        bestk_file
+    )
+    ch_mqc_files = ch_mqc_files.mix( PLOT_ADMIXTURE_ALL.out.admixture_html )
+    ch_versions = ch_versions.mix( PLOT_ADMIXTURE_ALL.out.versions )
+
 
     //SNPio plots
     FILTER_SUMMARY( snpio_pre )
