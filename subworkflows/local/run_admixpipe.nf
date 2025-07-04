@@ -10,6 +10,7 @@ include { CVSUM } from '../../modules/local/admixpipe/cvsum.nf'
 include { DISTRUCT } from '../../modules/local/admixpipe/distructrerun.nf'
 include { EVALADMIX } from '../../modules/local/admixpipe/evaladmix.nf'
 include { BESTK } from '../../modules/local/bestK.nf'
+include { EVANNO } from '../../modules/local/evanno.nf'
 
 workflow RUN_ADMIXPIPE {
     take:
@@ -83,6 +84,11 @@ workflow RUN_ADMIXPIPE {
     )
     ch_versions = ch_versions.mix( EVALADMIX.out.versions )
 
+    // Evanno calculations (backup for bestK)
+    EVANNO(
+        CVSUM.out.ll_output
+    )
+
     // Fetch results for the best K value
     BESTK(
         CVSUM.out.cv_output,
@@ -92,8 +98,9 @@ workflow RUN_ADMIXPIPE {
 
     emit:
     best_results = DISTRUCT.out.best_results
-    bestK        = BESTK.out.bestK_file
+    bestK_file   = BESTK.out.bestK_file
     bestK_clumpp = BESTK.out.bestK_clumpp
+    evanno       = EVANNO.out.metrics
     inds         = ADMIXTUREPIPELINE.out.inds
     pops         = ADMIXTUREPIPELINE.out.pops
     cv_file      = CVSUM.out.cv_output

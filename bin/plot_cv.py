@@ -27,7 +27,7 @@ def build_comment(meta_dict):
     lines.append("-->")
     return "\n".join(lines)
 
-def generate_plot(input_file, output_file, header_comment):
+def generate_plot(input_file, output_file, header_comment, bestk=None):
     # 1) read & sort
     df = pd.read_csv(input_file, delim_whitespace=True)
     df['K'] = pd.to_numeric(df['K'], errors='raise')
@@ -46,6 +46,15 @@ def generate_plot(input_file, output_file, header_comment):
             line=dict(width=2),
         )
     )
+
+    # annotate best K if provided
+    if bestk is not None:
+        fig.add_vline(
+            x=bestk,
+            line=dict(color='red', dash='dash'),
+            annotation_text=f"K={bestk}",
+            annotation_position="top right"
+        )
 
     fig.update_layout(
         title="Cross-validation Error by K",
@@ -74,6 +83,9 @@ if __name__ == "__main__":
         required=True,
         help="Path to HTML file containing MultiQC metadata comment block",
     )
+    parser.add_argument(
+        "--bestk", type=int, help="Best K value to annotate"
+    )
     parser.add_argument("--id", help="Override for the 'id' field in the metadata")
     parser.add_argument(
         "--title", help="Override for the 'title' field in the metadata"
@@ -91,4 +103,4 @@ if __name__ == "__main__":
             metadata[fld] = val
 
     header_comment = build_comment(metadata)
-    generate_plot(args.input_file, args.output, header_comment)
+    generate_plot(args.input_file, args.output, header_comment, args.bestk)

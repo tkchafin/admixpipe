@@ -1,11 +1,8 @@
-//
-// Rank loci using Rosenberg et al. 2003 importance indices
-//
 include { PLOT_CV } from '../../modules/local/report/plot_cv.nf'
+include { PLOT_EVANNO } from '../../modules/local/report/plot_evanno.nf'
 include { SAMPLE_SUMMARY } from '../../modules/local/report/sample_summary.nf'
 include { PLOT_ADMIXTURE } from '../../modules/local/report/plot_admixture.nf'
 include { FILTER_SUMMARY } from '../../modules/local/report/filter_summary.nf'
-include { BCFTOOLS_QUERY } from '../../modules/local/bcftools_query.nf'
 include { BCFTOOLS_QUERY as BCFTOOLS_QUERY_PRE } from '../../modules/local/bcftools_query.nf'
 include { BCFTOOLS_QUERY as BCFTOOLS_QUERY_POST } from '../../modules/local/bcftools_query.nf'
 
@@ -17,6 +14,8 @@ workflow GENERATE_REPORT {
     vcf_post
     tbi_post
     cv_file
+    evanno
+    bestk_file
     snpio_pre
     clumpp
     inds
@@ -27,9 +26,14 @@ workflow GENERATE_REPORT {
     ch_mqc_files = Channel.empty()
 
     //CV plot
-    PLOT_CV( cv_file )
+    PLOT_CV( cv_file, bestk_file )
     ch_versions = ch_versions.mix( PLOT_CV.out.versions )
     ch_mqc_files = ch_mqc_files.mix( PLOT_CV.out.cv_html )
+
+    //Evanno plot
+    PLOT_EVANNO( evanno, bestk_file )
+    ch_versions = ch_versions.mix( PLOT_EVANNO.out.versions )
+    ch_mqc_files = ch_mqc_files.mix( PLOT_EVANNO.out.evanno_html )
 
     //Get individual lists from vcfs
     BCFTOOLS_QUERY_PRE( vcf_pre, tbi_pre )
