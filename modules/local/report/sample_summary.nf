@@ -4,10 +4,9 @@ process SAMPLE_SUMMARY {
     container "docker.io/tkchafin/plotly:1.1"
 
     input:
-        tuple val(meta), path(inds_pre)
-        tuple val(meta2), path(inds_post)
-        tuple val(meta3), path(snpio_pre)
-        tuple val(meta4), path(snpio_post)
+        tuple val(meta), path(snpio_report_data)
+        tuple val(meta2), path(inds_pre)
+        tuple val(meta3), path(inds_post)
 
     output:
         path("sample_summary_mqc.json"), emit: summary_txt
@@ -18,10 +17,8 @@ process SAMPLE_SUMMARY {
 
     """
     echo "🔍 Finding input files..."
-    miss1=\$(find -L ${snpio_pre} -type f -name 'individual_missingness.csv' | head -n1)
-    miss2=\$(find -L ${snpio_post} -type f -name 'individual_missingness.csv' | head -n1)
-    het1=\$(find -L ${snpio_pre} -type f -name 'pop_individ_locus_missingness.csv' | head -n1)
-    het2=\$(find -L ${snpio_post} -type f -name 'pop_individ_locus_missingness.csv' | head -n1)
+    miss1=\$(find -L ${snpio_report_data} -type f -name 'multiqc_individual_missingness_table.txt' | head -n1)
+    miss2=\$(find -L ${snpio_report_data} -type f -name 'multiqc_individual_missingness-2_table.txt' | head -n1)
 
     echo "📊 Generating sample summary..."
     sample_summary.py \\
@@ -29,8 +26,6 @@ process SAMPLE_SUMMARY {
         --inds-post ${inds_post} \\
         --miss-pre \$miss1 \\
         --miss-post \$miss2 \\
-        --het-pre \$het1 \\
-        --het-post \$het2 \\
         --header ${baseDir}/assets/multiqc_sample_stats.html \\
         --output sample_summary_mqc.json
 

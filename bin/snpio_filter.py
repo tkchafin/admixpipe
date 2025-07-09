@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import argparse
 import os
-from snpio import NRemover2, VCFReader
+from snpio import NRemover2, VCFReader, SNPioMultiQC, PopGenStatistics
 
 
 def get_prefix_from_vcf_path(vcf_path):
@@ -50,6 +50,12 @@ def main():
         default=0.9,
         help="Maximum missing data to retain a SNP (default: 0.9)",
     )
+    parser.add_argument(
+        "--permutations",
+        type=int,
+        default=1000,
+        help="Permutations/bootstraps for computing p-values with Fst, Nei distance",
+    )
     args = parser.parse_args()
 
     # extract prefix from VCF filename
@@ -82,10 +88,34 @@ def main():
         .resolve()
     )
     nrm.plot_sankey_filtering_report()
+    gd_filt.missingness_reports(prefix="filtered")
 
     # Write the filtered VCF using the modified prefix
     output_vcf = f"{prefix}.filter.vcf"
     gd_filt.write_vcf(output_vcf)
+
+    # Compute pop-gen summary statistics on the filtered object
+    pgs = PopGenStatistics(gd_filt)
+    pgs.summary_statistics(
+        n_permutations=args.permutations,
+        use_pvalues=True
+    )
+    pgs.pca()
+
+    # Outlier detection
+    pgs.detect_fst_outliers(
+        n_permutations=args.permutations,
+        correction_method="fdr_bh",
+        n_jobs=-1
+    )
+
+    # Generate report
+    SNPioMultiQC.build(
+        prefix=prefix,
+        output_dir="multiqc",
+        title="SNPio Report",
+        overwrite=True
+    )
 
 
 if __name__ == "__main__":

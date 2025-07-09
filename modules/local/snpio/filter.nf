@@ -2,7 +2,7 @@ process SNPIO_FILTER {
     tag "$meta.id"
     label 'process_medium'
 
-    container 'docker.io/btmartin721/snpio:1.3.21'
+    container 'docker.io/btmartin721/snpio:1.5.15'
 
     input:
     tuple val(meta), path(vcf)
@@ -10,9 +10,11 @@ process SNPIO_FILTER {
     tuple val(meta3), path(popmap)
 
     output:
-    tuple val(meta), path("${meta.id}.filter.nremover.vcf.gz"), emit: filtered_vcf
-    tuple val(meta), path("${meta.id}.filter.nremover.vcf.gz.tbi"), emit: filtered_tbi
+    tuple val(meta), path("${meta.id}.filter.vcf.gz"), emit: filtered_vcf
+    tuple val(meta), path("${meta.id}.filter.vcf.gz.tbi"), emit: filtered_tbi
     tuple val(meta), path("*_output"), emit: snpio_output
+    tuple val(meta), path("multiqc/multiqc_report.html"), emit: multiqc_report
+    tuple val(meta), path("multiqc/multiqc_report_data"), emit: multiqc_report_data
     path "versions.yml",     emit: versions
 
     script:
@@ -32,7 +34,7 @@ process SNPIO_FILTER {
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
-        SNPio: 1.3.21
+        SNPio: 1.5.15
     END_VERSIONS
     """
 }

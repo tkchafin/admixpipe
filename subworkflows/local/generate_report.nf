@@ -6,7 +6,7 @@ include { PLOT_ADMIXTURE_ALL } from '../../modules/local/report/plot_admixture_a
 include { FILTER_SUMMARY } from '../../modules/local/report/filter_summary.nf'
 include { BCFTOOLS_QUERY as BCFTOOLS_QUERY_PRE } from '../../modules/local/bcftools_query.nf'
 include { BCFTOOLS_QUERY as BCFTOOLS_QUERY_POST } from '../../modules/local/bcftools_query.nf'
-
+include { POP_SUMMARY } from '../../modules/local/report/pop_summary.nf'
 
 workflow GENERATE_REPORT {
     take:
@@ -19,6 +19,7 @@ workflow GENERATE_REPORT {
     bestk_file
     best_results
     snpio_pre
+    snpio_report_data
     clumpp
     inds
     pops
@@ -36,20 +37,6 @@ workflow GENERATE_REPORT {
     PLOT_EVANNO( evanno, bestk_file )
     ch_versions = ch_versions.mix( PLOT_EVANNO.out.versions )
     ch_mqc_files = ch_mqc_files.mix( PLOT_EVANNO.out.evanno_html )
-
-    //Get individual lists from vcfs
-    BCFTOOLS_QUERY_PRE( vcf_pre, tbi_pre )
-    BCFTOOLS_QUERY_POST( vcf_post, tbi_post )
-    ch_versions = ch_versions.mix( BCFTOOLS_QUERY_PRE.out.versions )
-
-    // //SNPio summary
-    // SAMPLE_SUMMARY(
-    //     BCFTOOLS_QUERY_PRE.out.samples,
-    //     BCFTOOLS_QUERY_POST.out.samples,
-    //     snpio_pre
-    // )
-    // ch_mqc_files = ch_mqc_files.mix( SAMPLE_SUMMARY.out.summary_txt )
-    // ch_versions = ch_versions.mix( SAMPLE_SUMMARY.out.versions )
 
 
     //Admixture barplots
@@ -71,6 +58,26 @@ workflow GENERATE_REPORT {
     ch_mqc_files = ch_mqc_files.mix( PLOT_ADMIXTURE_ALL.out.admixture_html )
     ch_versions = ch_versions.mix( PLOT_ADMIXTURE_ALL.out.versions )
 
+    //Get individual lists from vcfs
+    BCFTOOLS_QUERY_PRE( vcf_pre, tbi_pre )
+    BCFTOOLS_QUERY_POST( vcf_post, tbi_post )
+    ch_versions = ch_versions.mix( BCFTOOLS_QUERY_PRE.out.versions )
+
+    //SNPio sample missingness
+    SAMPLE_SUMMARY(
+        snpio_report_data,
+        BCFTOOLS_QUERY_PRE.out.samples,
+        BCFTOOLS_QUERY_POST.out.samples
+    )
+    ch_mqc_files = ch_mqc_files.mix( SAMPLE_SUMMARY.out.summary_txt )
+    ch_versions = ch_versions.mix( SAMPLE_SUMMARY.out.versions )
+
+    //SNPio sample missingness
+    POP_SUMMARY(
+        snpio_report_data
+    )
+    ch_mqc_files = ch_mqc_files.mix( POP_SUMMARY.out.summary_txt )
+    ch_versions = ch_versions.mix( POP_SUMMARY.out.versions )
 
     //SNPio plots
     FILTER_SUMMARY( snpio_pre )

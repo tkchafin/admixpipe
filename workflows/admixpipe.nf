@@ -48,6 +48,7 @@ workflow ADMIXPIPE {
     ch_filtered_vcf = SNPIO_FILTER.out.filtered_vcf.map { meta, file -> tuple(meta + [id: "${meta.id}_filtered"], file) }
     ch_filtered_tbi = SNPIO_FILTER.out.filtered_tbi.map { meta, file -> tuple(meta + [id: "${meta.id}_filtered"], file) }
     ch_snpio_output = SNPIO_FILTER.out.snpio_output.map { meta, dir -> tuple(meta + [id: "${meta.id}_filtered"], dir) }
+    ch_snpio_multiqc_data = SNPIO_FILTER.out.multiqc_report_data.map { meta, dir -> tuple(meta + [id: "${meta.id}_filtered"], dir) }
 
     //
     // Run admixture pipeline on filtered dataset
@@ -72,6 +73,7 @@ workflow ADMIXPIPE {
         RUN_ADMIXPIPE.out.bestK_file,
         RUN_ADMIXPIPE.out.best_results,
         ch_snpio_output,
+        ch_snpio_multiqc_data,
         RUN_ADMIXPIPE.out.bestK_clumpp,
         RUN_ADMIXPIPE.out.inds,
         RUN_ADMIXPIPE.out.pops,
