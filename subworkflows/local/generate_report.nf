@@ -7,6 +7,8 @@ include { FILTER_SUMMARY } from '../../modules/local/report/filter_summary.nf'
 include { BCFTOOLS_QUERY as BCFTOOLS_QUERY_PRE } from '../../modules/local/bcftools_query.nf'
 include { BCFTOOLS_QUERY as BCFTOOLS_QUERY_POST } from '../../modules/local/bcftools_query.nf'
 include { POP_SUMMARY } from '../../modules/local/report/pop_summary.nf'
+include { PLOT_PAIRWISE_FST } from '../../modules/local/report/pairwise_fst.nf'
+
 
 workflow GENERATE_REPORT {
     take:
@@ -79,9 +81,17 @@ workflow GENERATE_REPORT {
     ch_mqc_files = ch_mqc_files.mix( POP_SUMMARY.out.summary_txt )
     ch_versions = ch_versions.mix( POP_SUMMARY.out.versions )
 
+    //SNPio sample missingness
+    PLOT_PAIRWISE_FST(
+        snpio_report_data
+    )
+    ch_mqc_files = ch_mqc_files.mix( PLOT_PAIRWISE_FST.out.plot_html )
+    ch_versions = ch_versions.mix( PLOT_PAIRWISE_FST.out.versions )
+
     //SNPio plots
     FILTER_SUMMARY( snpio_pre )
     ch_mqc_files = ch_mqc_files.mix( FILTER_SUMMARY.out.sankey_html )
+
 
     emit:
     mqc_files    = ch_mqc_files

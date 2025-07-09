@@ -1,5 +1,6 @@
 process SAMPLE_SUMMARY {
     label 'process_single'
+    tag "$meta.id"
 
     container "docker.io/tkchafin/plotly:1.1"
 

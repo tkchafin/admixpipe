@@ -102,13 +102,6 @@ def main():
     )
     pgs.pca()
 
-    # Outlier detection
-    pgs.detect_fst_outliers(
-        n_permutations=args.permutations,
-        correction_method="fdr_bh",
-        n_jobs=-1
-    )
-
     # Generate report
     SNPioMultiQC.build(
         prefix=prefix,
