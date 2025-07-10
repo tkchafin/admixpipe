@@ -9,7 +9,7 @@ def load_missingness(path):
     if 'Sample' not in df.columns or 'Percent_Missingness' not in df.columns:
         raise ValueError(f"{path} must contain 'Sample' and 'Percent_Missingness'")
     df['Sample'] = df['Sample'].astype(str).str.strip()
-    df['Missing'] = df['Percent_Missingness'] / 100.0
+    df['Missing'] = df['Percent_Missingness']
     return df[['Sample','Missing']]
 
 def parse_html_header(path):
@@ -33,8 +33,8 @@ def write_mqc_json(df, metadata, output):
         'xlab':      'Metric',
         'xDecimals': False,
         'tt_label':  'Metric',
-        'min':       0,
-        'max':       1,
+        'min':       0.0,
+        'max':       100.0,
         'scale':     'YlGnBu'
     }
     out = {'data': data, 'pconfig': pconfig}

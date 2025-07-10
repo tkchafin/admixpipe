@@ -14,7 +14,7 @@ def load_missingness(path):
     if 'Sample' not in df.columns or 'Percent_Missingness' not in df.columns:
         raise ValueError(f"{path} must contain 'Sample' and 'Percent_Missingness'")
     df['Sample'] = df['Sample'].astype(str).str.strip()
-    df['Missing'] = df['Percent_Missingness'] / 100.0
+    df['Missing'] = df['Percent_Missingness']
     return df.drop(columns=['Percent_Missingness'])
 
 def parse_html_header(path):
@@ -38,8 +38,8 @@ def write_mqc_json(df, metadata, output):
         'xlab':      'Metric',
         'xDecimals': False,
         'tt_label':  'Metric',
-        'min':       0,
-        'max':       1,
+        'min':       0.0,
+        'max':       100.0,
         'scale':     'YlGnBu'
     }
     out = {'data': data, 'pconfig': pconfig}
@@ -54,12 +54,9 @@ def main(args):
     inds_post = load_list(args.inds_post)
     miss_pre  = load_missingness(args.miss_pre)[['Sample', 'Missing']].rename(columns={'Missing':'Missing_Pre'})
     miss_post = load_missingness(args.miss_post)[['Sample', 'Missing']].rename(columns={'Missing':'Missing_Post'})
-    print(miss_pre)
-    print(miss_post)
     df = pd.DataFrame({'Sample': inds_pre})
     df = df.merge(miss_pre,  on='Sample', how='left') \
            .merge(miss_post, on='Sample', how='left')
-    print(df)
     df.loc[~df['Sample'].isin(inds_post), 'Missing_Post'] = np.nan
     if args.header:
         meta = parse_html_header(args.header)
