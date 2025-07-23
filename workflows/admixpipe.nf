@@ -27,6 +27,9 @@ workflow ADMIXPIPE {
     ch_vcf     // [meta, vcf]
     ch_tbi     // [meta, tbi]
     ch_popmap  // [meta, popmap]
+    ch_site_coords
+    ch_geo_data
+    ch_geo_data_dir
 
     main:
 
@@ -77,10 +80,12 @@ workflow ADMIXPIPE {
         RUN_ADMIXPIPE.out.bestK_clumpp,
         RUN_ADMIXPIPE.out.inds,
         RUN_ADMIXPIPE.out.pops,
+        ch_site_coords,
+        ch_geo_data,
+        ch_geo_data_dir
     )
     ch_versions = ch_versions.mix( GENERATE_REPORT.out.versions )
     ch_multiqc_files = ch_multiqc_files.mix( GENERATE_REPORT.out.mqc_files )
-
 
     //
     // Collate and save software versions

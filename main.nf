@@ -34,6 +34,9 @@ workflow ACAMEL_ADMIXPIPE {
     vcf     // channel: vcf read in from --input
     tbi     // channel: vcf index
     popmap  // channel: population map
+    site_coords
+    geo_data
+    geo_data_dir
 
     main:
 
@@ -43,7 +46,10 @@ workflow ACAMEL_ADMIXPIPE {
     ADMIXPIPE (
         vcf,
         tbi,
-        popmap
+        popmap,
+        site_coords,
+        geo_data,
+        geo_data_dir,
     )
 
     emit:
@@ -72,6 +78,9 @@ workflow {
         params.outdir,
         params.input,
         params.popmap,
+        params.site_coords,
+        params.geo_data_config,
+        params.geo_data_dir,
         params.reference
     )
 
@@ -81,7 +90,10 @@ workflow {
     ACAMEL_ADMIXPIPE (
         PIPELINE_INITIALISATION.out.vcf,
         PIPELINE_INITIALISATION.out.tbi,
-        PIPELINE_INITIALISATION.out.popmap
+        PIPELINE_INITIALISATION.out.popmap,
+        PIPELINE_INITIALISATION.out.site_coords,
+        PIPELINE_INITIALISATION.out.geo_data,
+        PIPELINE_INITIALISATION.out.geo_data_dir,
     )
 
     //

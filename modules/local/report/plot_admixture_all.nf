@@ -1,4 +1,4 @@
-process PLOT_ADMIXTURE_ALL {
+process PLOT_ADMIXTURE_MULTIK {
     tag "$meta.id"
     label 'process_single'
 

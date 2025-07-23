@@ -39,6 +39,9 @@ workflow PIPELINE_INITIALISATION {
     outdir            // string: The output directory where the results will be saved
     input             // string: Path to input VCF or VCF.gz file
     popmap            // string: path to popmap file
+    site_coords
+    geo_data_config
+    geo_data_dir
     reference
 
     main:
@@ -114,6 +117,58 @@ workflow PIPELINE_INITIALISATION {
         }
         .set{ ch_popmap }
 
+    //
+    // Channel for geo_data_config (optional)
+    //
+    if ( params.geo_data_config ) {
+        Channel
+            .fromPath( params.geo_data_config )
+            .map { file ->
+                def meta = [ id: file.simpleName ]
+                return [ meta, file ]
+            }
+            .set { ch_geo_data_config }
+    }
+    else {
+        Channel
+            .empty()
+            .set { ch_geo_data_config }
+    }
+
+
+    //
+    // Channel for a *pre‑staged* geodata directory (optional)
+    //
+    if ( params.geo_data_dir ) {
+        Channel
+            .fromPath( params.geo_data_dir )      // accepts dir or wildcard
+            .map { dir ->
+                def meta = [ id: file(dir).getBaseName() ]
+                return [ meta, dir ]
+            }
+            .set { ch_geo_data_dir }
+    }
+    else {
+        Channel.empty().set { ch_geo_data_dir }
+    }
+
+    //
+    // Channel for site_coords (optional)
+    //
+    if ( params.site_coords ) {
+        Channel
+            .fromPath( params.site_coords )
+            .map { file ->
+                def meta = [ id: file.simpleName ]
+                return [ meta, file ]
+            }
+            .set { ch_site_coords }
+    }
+    else {
+        Channel
+            .empty()
+            .set { ch_site_coords }
+    }
 
     // Collect versions
     ch_versions = ch_versions.mix(TABIX_BGZIP.out.versions)
@@ -123,6 +178,9 @@ workflow PIPELINE_INITIALISATION {
     vcf       = ch_tabix_vcf_input
     tbi       = TABIX_TABIX.out.tbi
     popmap    = ch_popmap
+    site_coords = ch_site_coords
+    geo_data    = ch_geo_data_config
+    geo_data_dir = ch_geo_data_dir
     versions  = ch_versions
 }
 

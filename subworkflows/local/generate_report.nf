@@ -2,13 +2,15 @@ include { PLOT_CV } from '../../modules/local/report/plot_cv.nf'
 include { PLOT_EVANNO } from '../../modules/local/report/plot_evanno.nf'
 include { SAMPLE_SUMMARY } from '../../modules/local/report/sample_summary.nf'
 include { PLOT_ADMIXTURE } from '../../modules/local/report/plot_admixture.nf'
-include { PLOT_ADMIXTURE_ALL } from '../../modules/local/report/plot_admixture_all.nf'
+include { PLOT_ADMIXTURE_MULTIK } from '../../modules/local/report/plot_admixture_all.nf'
+include { PLOT_ADMIXTURE_SPATIAL } from '../../modules/local/report/plot_admixture_spatial.nf'
+include { PLOT_ADMIXTURE_SPATIAL_MULTIK } from '../../modules/local/report/plot_admixture_spatial_multik.nf'
 include { FILTER_SUMMARY } from '../../modules/local/report/filter_summary.nf'
 include { BCFTOOLS_QUERY as BCFTOOLS_QUERY_PRE } from '../../modules/local/bcftools_query.nf'
 include { BCFTOOLS_QUERY as BCFTOOLS_QUERY_POST } from '../../modules/local/bcftools_query.nf'
 include { POP_SUMMARY } from '../../modules/local/report/pop_summary.nf'
 include { PLOT_PAIRWISE_FST } from '../../modules/local/report/pairwise_fst.nf'
-
+include { STAGE_GEODATA_LAYERS } from '../../modules/local/report/stage_geodata.nf'
 
 workflow GENERATE_REPORT {
     take:
@@ -25,6 +27,9 @@ workflow GENERATE_REPORT {
     clumpp
     inds
     pops
+    site_coords
+    geo_data
+    geo_data_dir
 
     main:
     ch_versions = Channel.empty()
@@ -51,14 +56,70 @@ workflow GENERATE_REPORT {
     ch_versions = ch_versions.mix( PLOT_ADMIXTURE.out.versions )
 
     //Admixture barplots -- all
-    PLOT_ADMIXTURE_ALL(
+    PLOT_ADMIXTURE_MULTIK(
         best_results,
         inds,
         pops,
         bestk_file
     )
-    ch_mqc_files = ch_mqc_files.mix( PLOT_ADMIXTURE_ALL.out.admixture_html )
-    ch_versions = ch_versions.mix( PLOT_ADMIXTURE_ALL.out.versions )
+    ch_mqc_files = ch_mqc_files.mix( PLOT_ADMIXTURE_MULTIK.out.admixture_html )
+    ch_versions = ch_versions.mix( PLOT_ADMIXTURE_MULTIK.out.versions )
+
+    //Admixture maps
+    if (params.site_coords){
+        if (params.geo_data_config){
+
+            STAGE_GEODATA_LAYERS( geo_data, geo_data_dir )
+
+            PLOT_ADMIXTURE_SPATIAL(
+                clumpp,
+                inds,
+                pops,
+                site_coords,
+                STAGE_GEODATA_LAYERS.out.geo_data_dir
+            )
+            ch_mqc_files = ch_mqc_files.mix( PLOT_ADMIXTURE_SPATIAL.out.plot_html )
+            ch_versions = ch_versions.mix( PLOT_ADMIXTURE_SPATIAL.out.versions )
+
+            //ADMIXTURE maps (all K)
+            PLOT_ADMIXTURE_SPATIAL_MULTIK(
+                best_results,
+                inds,
+                pops,
+                site_coords,
+                STAGE_GEODATA_LAYERS.out.geo_data_dir
+            )
+            ch_mqc_files = ch_mqc_files.mix( PLOT_ADMIXTURE_SPATIAL_MULTIK.out.plot_html )
+            ch_versions = ch_versions.mix( PLOT_ADMIXTURE_SPATIAL_MULTIK.out.versions )
+
+        }else{
+            PLOT_ADMIXTURE_SPATIAL(
+                clumpp,
+                inds,
+                pops,
+                site_coords,
+                tuple( [], [] )
+            )
+            ch_mqc_files = ch_mqc_files.mix( PLOT_ADMIXTURE_SPATIAL.out.plot_html )
+            ch_versions = ch_versions.mix( PLOT_ADMIXTURE_SPATIAL.out.versions )
+
+            PLOT_ADMIXTURE_SPATIAL_MULTIK(
+                best_results,
+                inds,
+                pops,
+                site_coords,
+                tuple( [], [] )
+            )
+            ch_mqc_files = ch_mqc_files.mix( PLOT_ADMIXTURE_SPATIAL_MULTIK.out.plot_html )
+            ch_versions = ch_versions.mix( PLOT_ADMIXTURE_SPATIAL_MULTIK.out.versions )
+
+        }
+    }
+
+    //EvalAdmix (best and all K)
+    //
+    //
+    //
 
     //Get individual lists from vcfs
     BCFTOOLS_QUERY_PRE( vcf_pre, tbi_pre )
@@ -88,10 +149,14 @@ workflow GENERATE_REPORT {
     ch_mqc_files = ch_mqc_files.mix( PLOT_PAIRWISE_FST.out.plot_html )
     ch_versions = ch_versions.mix( PLOT_PAIRWISE_FST.out.versions )
 
-    //SNPio plots
+    //SNPio sankey
     FILTER_SUMMARY( snpio_pre )
     ch_mqc_files = ch_mqc_files.mix( FILTER_SUMMARY.out.sankey_html )
 
+    //SNPio PCA
+    //
+    //
+    //
 
     emit:
     mqc_files    = ch_mqc_files
