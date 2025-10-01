@@ -19,10 +19,10 @@ process BESTK {
     script:
     """
     # Determine best K (excluding K=1)
-    // #awk 'NR>1 && \$1!=1 {
-    // #    if (min=="" || \$2<min) { min=\$2; k=\$1 }
-    // #}
-    // #END { print k }' ${cv_file} > bestK.txt
+    awk 'NR>1 && \$1!=1 {
+        if (min=="" || \$2<min) { min=\$2; k=\$1 }
+    }
+    END { print k }' ${cv_file} > bestK.txt
 
     # Read best K
     K=\$(cat bestK.txt)
