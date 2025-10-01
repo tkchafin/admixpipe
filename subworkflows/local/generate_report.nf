@@ -10,6 +10,7 @@ include { BCFTOOLS_QUERY as BCFTOOLS_QUERY_PRE } from '../../modules/local/bcfto
 include { BCFTOOLS_QUERY as BCFTOOLS_QUERY_POST } from '../../modules/local/bcftools_query.nf'
 include { POP_SUMMARY } from '../../modules/local/report/pop_summary.nf'
 include { PLOT_PAIRWISE_FST } from '../../modules/local/report/pairwise_fst.nf'
+include { PLOT_PCA } from '../../modules/local/report/plot_pca.nf'
 include { STAGE_GEODATA_LAYERS } from '../../modules/local/report/stage_geodata.nf'
 
 workflow GENERATE_REPORT {
@@ -154,9 +155,11 @@ workflow GENERATE_REPORT {
     ch_mqc_files = ch_mqc_files.mix( FILTER_SUMMARY.out.sankey_html )
 
     //SNPio PCA
-    //
-    //
-    //
+    PLOT_PCA(
+        snpio_report_data
+    )
+    ch_mqc_files = ch_mqc_files.mix( PLOT_PCA.out.plot_html )
+    ch_versions = ch_versions.mix( PLOT_PCA.out.versions )
 
     emit:
     mqc_files    = ch_mqc_files

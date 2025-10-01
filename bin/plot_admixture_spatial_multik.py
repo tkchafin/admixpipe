@@ -175,6 +175,12 @@ def main():
             style_function=lambda f,s=style: s
         ).add_to(m)
 
+    # auto‑zoom
+    m.fit_bounds([
+        [coords.Latitude.min(), coords.Longitude.min()],
+        [coords.Latitude.max(), coords.Longitude.max()],
+    ])
+
     # one radio‐style layer per K
     for idx,K in enumerate(sorted(Ks)):
         dfk = load_data(str(files[K]), args.inds, args.pops)
