@@ -3,6 +3,7 @@ include { PLOT_EVANNO } from '../../modules/local/report/plot_evanno.nf'
 include { SAMPLE_SUMMARY } from '../../modules/local/report/sample_summary.nf'
 include { PLOT_ADMIXTURE } from '../../modules/local/report/plot_admixture.nf'
 include { PLOT_ADMIXTURE_KRIGING } from '../../modules/local/report/plot_admixture_kriging.nf'
+include { PLOT_ADMIXTURE_KRIGING_MULTIK } from '../../modules/local/report/plot_admixture_kriging_multik.nf'
 include { PLOT_ADMIXTURE_MULTIK } from '../../modules/local/report/plot_admixture_all.nf'
 include { PLOT_ADMIXTURE_SPATIAL } from '../../modules/local/report/plot_admixture_spatial.nf'
 include { PLOT_ADMIXTURE_SPATIAL_MULTIK } from '../../modules/local/report/plot_admixture_spatial_multik.nf'
@@ -90,11 +91,17 @@ workflow GENERATE_REPORT {
                 site_coords,
                 STAGE_GEODATA_LAYERS.out.geo_data_dir
             )
-            ch_mqc_files = ch_mqc_files
-                .mix( PLOT_ADMIXTURE_KRIGING.out.html_continuous )
-                .mix( PLOT_ADMIXTURE_KRIGING.out.html_discrete )
+            ch_mqc_files = ch_mqc_files.mix( PLOT_ADMIXTURE_KRIGING.out.html_discrete )
                 .mix( PLOT_ADMIXTURE_KRIGING.out.html_simpson )
             ch_versions = ch_versions.mix( PLOT_ADMIXTURE_KRIGING.out.versions )
+
+            PLOT_ADMIXTURE_KRIGING_MULTIK(
+                best_results,
+                inds,
+                pops,
+                site_coords,
+                STAGE_GEODATA_LAYERS.out.geo_data_dir
+            )
 
             //ADMIXTURE maps (all K)
             PLOT_ADMIXTURE_SPATIAL_MULTIK(
@@ -125,11 +132,17 @@ workflow GENERATE_REPORT {
                 site_coords,
                 tuple( [], [] )
             )
-            ch_mqc_files = ch_mqc_files
-                .mix( PLOT_ADMIXTURE_KRIGING.out.html_continuous )
-                .mix( PLOT_ADMIXTURE_KRIGING.out.html_discrete )
+            ch_mqc_files = ch_mqc_files.mix( PLOT_ADMIXTURE_KRIGING.out.html_discrete )
                 .mix( PLOT_ADMIXTURE_KRIGING.out.html_simpson )
             ch_versions = ch_versions.mix( PLOT_ADMIXTURE_KRIGING.out.versions )
+
+            PLOT_ADMIXTURE_KRIGING_MULTIK(
+                best_results,
+                inds,
+                pops,
+                site_coords,
+                tuple( [], [] )
+            )
 
             PLOT_ADMIXTURE_SPATIAL_MULTIK(
                 best_results,

@@ -2,8 +2,13 @@
 """
 Spatial kriging of ADMIXTURE average ancestry proportions → GeoTIFFs + MultiQC-ready HTML
 -----------------------------------------------------------------------------------------
-* Retains EXACT SAME parsing as your pie-chart script (Q/inds/pops/coords + overlays)
+* EXACT SAME parsing as your pie-chart script (Q/inds/pops/coords + overlays)
 * Kriging per K (PyKrige spherical if available; falls back to IDW), optionally parallel
+* Folium HTML maps on Leaflet basemaps (no axes), with:
+    - auto-fit to raster extent
+    - overlays from --geo_data_json (styled; optional z_order respected)
+    - north arrow (↑ N) and styled scale bar
+    - radio-style toggle for multi-K continuous layers
 * Outputs:
   - <prefix>_kriging_continuous.tif           (Float32, K bands; nodata=-9999)
   - <prefix>_kriging_discrete.tif             (UInt8/UInt16, 1 band; 0=nodata, 1..K=argmax class)
@@ -115,8 +120,7 @@ def rgb_to_hex(col):
     return f"#{int(m[1]):02x}{int(m[2]):02x}{int(m[3]):02x}" if m else col
 
 def palette(name, n):
-    # Use Plotly-like names via matplotlib fallbacks when needed
-    # Here we rely on matplotlib's tab20 / viridis etc. but allow hex inputs too.
+    # Use matplotlib colormaps; hex strings
     if name.lower() in ("spectral", "viridis", "plasma", "inferno", "magma", "cividis"):
         cmap = mplcm.get_cmap(name)
         cols = [mplcolors.to_hex(cmap(i/(max(n-1,1)))) for i in range(n)]
@@ -126,11 +130,13 @@ def palette(name, n):
     return [mplcolors.to_hex(cmap(i % 20)) for i in range(n)]
 
 def load_overlays(path):
-    # EXACTLY like your Folium pie-chart script: preserve file order, no sorting
     if not path:
         return []
-    obj = json.loads(Path(path).read_text())
-    return [obj] if isinstance(obj, dict) else obj
+    data = json.loads(Path(path).read_text())
+    if isinstance(data, dict):
+        data = [data]
+    # preserve file order; respect optional z_order
+    return sorted(data, key=lambda d: int(d.get("z_order", 0)))
 
 # ───────────────────────── kriging & raster helpers ─────────────────────────
 def compute_bounds(df_sites, overlays):
@@ -269,29 +275,6 @@ def write_geotiff_single(xs, ys, band, path, dtype, nodata, colormap=None, descr
         if (colormap is not None) and (_dtype == "uint8"):
             dst.write_colormap(1, colormap)
 
-def write_geotiff_rgb(xs, ys, rgb_uint8, path, valid_mask=None):
-    """Write a 3-band uint8 RGB raster (merged continuous), north-up."""
-    ny, nx, _ = rgb_uint8.shape
-    x_edges, y_edges = grid_edges(xs, ys)
-    west, south, east, north = x_edges[0], y_edges[0], x_edges[-1], y_edges[-1]
-    transform = from_bounds(west, south, east, north, nx, ny)
-
-    rgb = rgb_uint8[::-1, :, :]  # flip rows so row 0 = north
-    mask = valid_mask[::-1, :] if valid_mask is not None else None
-
-    with rasterio.open(
-        path, "w",
-        driver="GTiff",
-        height=ny, width=nx, count=3,
-        dtype="uint8", crs="EPSG:4326", transform=transform,
-        tiled=True, compress="deflate", predictor=2, photometric="RGB"
-    ) as dst:
-        dst.write(rgb[..., 0], 1)
-        dst.write(rgb[..., 1], 2)
-        dst.write(rgb[..., 2], 3)
-        if mask is not None:
-            dst.write_mask(np.where(mask, 255, 0).astype("uint8"))
-
 # ───────────────────────── image encoding for Folium overlays ─────────────────────────
 def scalar_to_rgba_png(z, vmin=0.0, vmax=1.0, cmap_name="viridis", alpha=220):
     """Map a 2D float array to RGBA and return base64 PNG data URL; NaN → fully transparent."""
@@ -321,63 +304,37 @@ def classes_to_rgba_png(classes, class_hex, nodata_val=0, alpha=230):
     rgba = rgba[::-1, :, :]
     return "data:image/png;base64," + encode_png(rgba)
 
-# ───────────────────────── merged continuous (dominance→color, mixed→gray) ─────────────────────────
-def hex_to_rgb(h):
-    h = h.strip()
-    if h.startswith("#") and len(h) == 7:
-        return tuple(int(h[i:i+2], 16) for i in (1,3,5))
-    raise ValueError(f"Bad hex color: {h}")
-
-def make_merged_rgb(stack, colors_hex, thresh=0.5, margin=0.0, gray_rgb=(200,200,200)):
-    """
-    stack: (K, ny, nx) in [0,1]
-    colors_hex: list of K hex colors for winners
-    thresh: min winner proportion to color
-    margin: min (winner - runner_up) to color
-    returns (ny, nx, 3) uint8 (north-down; caller flips for IO)
-    """
-    K, ny, nx = stack.shape
-    rgb = np.zeros((ny, nx, 3), dtype=np.float32)
-    rgb[:] = gray_rgb
-
-    m = np.nanmax(stack, axis=0)
-    idx = np.nanargmax(stack, axis=0)
-    if K > 1:
-        srt = np.sort(stack, axis=0)
-        second = srt[-2]
-    else:
-        second = np.zeros_like(m)
-
-    dominant = (m >= float(thresh)) & ((m - second) >= float(margin))
-    if not np.any(dominant):
-        return rgb.astype(np.uint8)
-
-    base_cols = np.array([hex_to_rgb(c) for c in colors_hex], dtype=np.float32)
-    denom = max(1e-6, 1.0 - float(thresh))
-    alpha = np.zeros_like(m, dtype=np.float32)
-    alpha[dominant] = np.clip((m[dominant] - float(thresh)) / denom, 0.0, 1.0)
-
-    for k in range(K):
-        mask = (idx == k) & dominant
-        if not np.any(mask):
-            continue
-        for c in range(3):
-            rgb[..., c][mask] = gray_rgb[c] * (1.0 - alpha[mask]) + base_cols[k, c] * alpha[mask]
-
-    return np.clip(rgb, 0, 255).astype(np.uint8)
-
 # ───────────────────────── Folium map builders (HTML only) ─────────────────────────
-def _folium_base_map(xs, ys, basemap):
-    x_edges, y_edges = grid_edges(xs, ys)
-    west, south, east, north = x_edges[0], y_edges[0], x_edges[-1], y_edges[-1]
-    m = folium.Map(
-        location=[(south+north)/2, (west+east)/2],
-        zoom_start=6, tiles=basemap,
-        control_scale=True, zoom_control=False,
-        width="100%", height="100%"
-    )
-    m.fit_bounds([[south, west], [north, east]])
-    return m, [[south, west], [north, east]]
+def _styled_map(basemap_name, center_lat, center_lon):
+    # Try requested basemap; fallback if needed (matches your example behavior)
+    try:
+        m = folium.Map(
+            location=[center_lat, center_lon],
+            zoom_start=6, tiles=basemap_name,
+            control_scale=True, zoom_control=False,
+            width="100%", height="100%"
+        )
+    except Exception:
+        m = folium.Map(
+            location=[center_lat, center_lon],
+            zoom_start=6, tiles="CartoDB Positron",
+            control_scale=True, zoom_control=False,
+            width="100%", height="100%"
+        )
+
+    # Inject the same styling, scale bar look, and north arrow as your example
+    m.get_root().header.add_child(Element("""
+      <style>
+        html,body,#map{height:100%!important;margin:0;}
+        .leaflet-control-zoomslider,.leaflet-control-zoom{display:none!important;}
+        .leaflet-control-scale{background:rgba(255,255,255,0.9);font-size:10px;padding:2px 6px;}
+        #map{border:2px solid #000;}
+      </style>
+    """))
+    m.get_root().html.add_child(Element(
+        '<div style="position:absolute;top:8px;right:10px;z-index:999;font-size:1.2em;">↑ N</div>'
+    ))
+    return m
 
 def _add_overlays(m, overlays):
     for layer in overlays:
@@ -390,7 +347,7 @@ def _add_overlays(m, overlays):
         ).add_to(m)
 
 def _add_samples_black_dots(m, samples_df):
-    if samples_df.empty:
+    if samples_df is None or samples_df.empty:
         return
     for _, r in samples_df.iterrows():
         folium.CircleMarker(
@@ -398,9 +355,23 @@ def _add_samples_black_dots(m, samples_df):
             radius=3, color="#000000", weight=0.5, fill=True, fill_opacity=1.0
         ).add_to(m)
 
+def _fit_to_bounds(m, bounds):
+    west, south, east, north = bounds
+    m.fit_bounds([[south, west], [north, east]])
+
+def _base_map_from_bounds(bounds, basemap_name):
+    west, south, east, north = bounds
+    m = _styled_map(basemap_name, center_lat=(south+north)/2, center_lon=(west+east)/2)
+    _fit_to_bounds(m, bounds)
+    return m, [[south, west], [north, east]]
+
 def build_folium_continuous_map(xs, ys, stack, layer_names, samples_df, overlays, basemap):
-    m, bounds = _folium_base_map(xs, ys, basemap)
-    # one FeatureGroup per K, radio-style via JS below
+    # Compute exact raster bounds from grid edges → fit view exactly to overlay extent
+    x_edges, y_edges = grid_edges(xs, ys)
+    west, south, east, north = x_edges[0], y_edges[0], x_edges[-1], y_edges[-1]
+    m, bounds = _base_map_from_bounds((west, south, east, north), basemap)
+
+    # One FeatureGroup per K; radio-style toggle via JS below
     for i, name in enumerate(layer_names):
         url = scalar_to_rgba_png(stack[i], vmin=0.0, vmax=1.0, cmap_name="viridis", alpha=220)
         fg = folium.FeatureGroup(name=name, show=(i == 0))
@@ -408,10 +379,12 @@ def build_folium_continuous_map(xs, ys, stack, layer_names, samples_df, overlays
             image=url, bounds=bounds, opacity=1.0, interactive=False, cross_origin=False
         ).add_to(fg)
         fg.add_to(m)
+
     _add_overlays(m, overlays)
     _add_samples_black_dots(m, samples_df)
     folium.LayerControl(collapsed=False).add_to(m)
-    # convert overlay checkboxes → radio (exactly like your pie-chart script)
+
+    # Convert overlay checkboxes → radio (exactly like your pie-chart script)
     m.get_root().html.add_child(Element("""
 <script>
 document.querySelectorAll('.leaflet-control-layers-overlays input').forEach((i)=>{ i.type='radio'; i.name='radios'; });
@@ -420,7 +393,9 @@ document.querySelectorAll('.leaflet-control-layers-overlays input').forEach((i)=
     return m
 
 def build_folium_single_map(xs, ys, image_url, samples_df, overlays, basemap, layer_name):
-    m, bounds = _folium_base_map(xs, ys, basemap)
+    x_edges, y_edges = grid_edges(xs, ys)
+    west, south, east, north = x_edges[0], y_edges[0], x_edges[-1], y_edges[-1]
+    m, bounds = _base_map_from_bounds((west, south, east, north), basemap)
     fg = folium.FeatureGroup(name=layer_name, show=True)
     folium.raster_layers.ImageOverlay(
         image=image_url, bounds=bounds, opacity=1.0, interactive=False, cross_origin=False
@@ -447,8 +422,6 @@ def main():
     ap.add_argument("--site_coords", required=True, help="TSV with ID, Latitude, Longitude (no header)")
     ap.add_argument("--geo_data_json", help="Optional GeoJSON/shapefile overlay descriptor")
     # MultiQC templates (per output)
-    ap.add_argument("--template_cont",   help="MultiQC header template for continuous kriging HTML")
-    ap.add_argument("--template_merged", help="MultiQC header template for merged continuous HTML")
     ap.add_argument("--template_disc",   help="MultiQC header template for discrete (argmax) HTML")
     ap.add_argument("--template_div",    help="MultiQC header template for Simpson diversity HTML")
     # Outputs
@@ -476,12 +449,8 @@ def main():
         return outdir / (f"{stem}{('_' + suffix) if suffix else ''}{ext}")
 
     # Output paths
-    tiff_cont = OP("kriging_continuous", ".tif")
     tiff_disc = OP("kriging_discrete",   ".tif")
     tiff_div  = OP("kriging_simpson",    ".tif")
-    tiff_merg = OP("kriging_continuous_merged", ".tif")
-    html_cont = OP("kriging_continuous", ".html")
-    html_merg = OP("kriging_continuous_merged", ".html")
     html_disc = OP("kriging_discrete",   ".html")
     html_div  = OP("kriging_simpson",    ".html")
     tsv_path  = Path(args.table_out) if args.table_out else OP("", ".tsv")
@@ -542,9 +511,6 @@ def main():
             stack[:, over[0]] = stack[:, over[0]] / sums[:, over[0]]
 
     # GeoTIFFs (rasters only; no basemap/overlays/points)
-    write_geotiff_multiband(xs, ys, stack, cluster_cols, str(tiff_cont))
-    print(f"✅ GeoTIFF (continuous, {len(cluster_cols)} bands): {tiff_cont}")
-
     # Discrete (argmax)
     K = len(cluster_cols)
     argmax_idx = np.nanargmax(stack, axis=0)  # 0..K-1
@@ -573,26 +539,10 @@ def main():
     write_geotiff_single(xs, ys, simpson, str(tiff_div), dtype="float32", nodata=-9999.0, descr="Simpson diversity")
     print(f"✅ GeoTIFF (Simpson diversity): {tiff_div}")
 
-    # Merged continuous (dominant color; gray where mixed) → RGB tif + HTML
-    rgb_merged = make_merged_rgb(
-        stack,
-        colors_hex=colors,
-        thresh=args.merge_thresh,
-        margin=args.merge_margin,
-        gray_rgb=(200,200,200)
-    )
-    valid_mask = np.any(np.isfinite(stack), axis=0)  # any band has data
-    write_geotiff_rgb(xs, ys, rgb_merged, str(tiff_merg), valid_mask=valid_mask)
-    print(f"✅ GeoTIFF (continuous merged RGB): {tiff_merg}")
-
-    # Sample points dataframe for HTML
+    # Sample points dataframe for HTML (black dots on top, like original)
     samples_df = df_sites[["Longitude","Latitude","ID","count"] + cluster_cols].copy()
 
-    # HTML (Folium) — basemap under, overlays (geo_data_json) in given order, points on top
-    # Continuous multi-K (radio)
-    m_cont = build_folium_continuous_map(xs, ys, stack, cluster_cols, samples_df, overlays, args.basemap)
-    save_folium_with_template(m_cont, args.template_cont, html_cont)
-
+    # HTML (Folium) — basemap under, overlays (geo_data_json) in z-order, points on top
     # Discrete single
     url_disc = classes_to_rgba_png(disc.astype(int), class_hex=colors, nodata_val=0, alpha=230)
     m_disc = build_folium_single_map(xs, ys, url_disc, samples_df, overlays, args.basemap, "Discrete (argmax)")
@@ -604,15 +554,7 @@ def main():
     m_div = build_folium_single_map(xs, ys, url_div, samples_df, overlays, args.basemap, "Simpson diversity")
     save_folium_with_template(m_div, args.template_div, html_div)
 
-    # Merged continuous single (use precomputed RGB)
-    rgba = np.dstack([rgb_merged, np.where(valid_mask, 230, 0).astype(np.uint8)])
-    rgba = rgba[::-1, :, :]  # flip for north-up in HTML overlay
-    url_merg = "data:image/png;base64," + encode_png(rgba)
-    m_merg = build_folium_single_map(xs, ys, url_merg, samples_df, overlays, args.basemap,
-                                     "Merged continuous (dominant color; gray where mixed)")
-    save_folium_with_template(m_merg, args.template_merged, html_merg)
-
-    print("🎉 All rasters and MultiQC-ready HTMLs written.")
+    print("🎉 All rasters and MultiQC-ready Folium HTMLs written.")
 
 if __name__ == "__main__":
     warnings.filterwarnings("ignore", category=UserWarning)

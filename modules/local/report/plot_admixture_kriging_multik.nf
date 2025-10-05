@@ -1,35 +1,36 @@
-process PLOT_ADMIXTURE_KRIGING {
+process PLOT_ADMIXTURE_KRIGING_MULTIK {
     tag "$meta.id"
     label 'process_medium'
 
     container "docker.io/tkchafin/pykrige:1.0"
 
     input:
-    tuple val(meta),  path(clumppfile)    // .Q file
-    tuple val(meta2), path(inds)          // one sample ID per line
-    tuple val(meta3), path(pops)          // one pop/site ID per line
-    tuple val(meta4), path(site_coords)   // TSV: ID,Lat,Lon
-    tuple val(meta5), path(geo_data)      // optional dir with config.json
+
+    tuple val(meta), path(best_results)
+    tuple val(meta2),  path(inds)         // one sample ID per line
+    tuple val(meta3),  path(pops)         // one pop/site ID per line
+    tuple val(meta4),  path(site_coords)  // TSV: ID,Lat,Lon
+    tuple val(meta5), path(geo_data)
 
     output:
-    path("admixture_kriging_discrete.html"),           emit: html_discrete
-    path("admixture_kriging_simpson.html"),            emit: html_simpson
-    path("admixture_kriging_discrete.tif"),            emit: tif_discrete
-    path("admixture_kriging_simpson.tif"),             emit: tif_simpson
+    path("multik_kriging_discrete.html"),           emit: html_discrete
+    path("multik_kriging_simpson.html"),            emit: html_simpson
+    path("geotiff"),                                emit: geotiff
     path("versions.yml"),                               emit: versions
 
     script:
     def args         = task.ext.args ?: ''
     def geo_data_arg = geo_data ? "--geo_data_json ${geo_data}/config.json" : ''
     """
-    kriging_singlek.py \\
-        --qmat         ${clumppfile} \\
+    kriging_multik.py \\
+        --indir         ${best_results} \\
         --inds         ${inds} \\
         --pops         ${pops} \\
         --site_coords  ${site_coords} \\
-        --out_prefix   admixture \\
-        --template_disc   ${baseDir}/assets/multiqc_kriging_discrete.html \\
-        --template_div    ${baseDir}/assets/multiqc_kriging_simpson.html \\
+        --out_prefix   "multik" \\
+        --geotiff_dir    "geotiff" \\
+        --template_disc   ${baseDir}/assets/multiqc_kriging_discrete_multik.html \\
+        --template_div    ${baseDir}/assets/multiqc_kriging_simpson_multik.html \\
         --grid_nx 500 --grid_ny 500 \\
         --jobs ${task.cpus} \\
         ${geo_data_arg} \\
