@@ -56,6 +56,12 @@ def main():
         default=1000,
         help="Permutations/bootstraps for computing p-values with Fst, Nei distance",
     )
+    parser.add_argument(
+        "--jobs",
+        type=int,
+        default=1,
+        help="Threads",
+    )
     args = parser.parse_args()
 
     # extract prefix from VCF filename
@@ -97,8 +103,9 @@ def main():
     # Compute pop-gen summary statistics on the filtered object
     pgs = PopGenStatistics(gd_filt)
     pgs.summary_statistics(
-        n_permutations=args.permutations,
-        use_pvalues=True
+        n_reps=args.permutations,
+        fst_method="permutation",
+        n_jobs=args.jobs
     )
     pgs.pca()
 
