@@ -302,17 +302,26 @@ def plotcorres_prepare_exact(cor_mat: np.ndarray,
 # Plotly figure building
 # ----------------------------
 
-def build_plotly_figure(res: PlotCorResResult,
-                        title: str,
-                        fid: Optional[Sequence[str]] = None,
-                        iid: Optional[Sequence[str]] = None,
-                        color_palette: Sequence[str] = ("#001260", "#EAEDE9", "#601200"),
-                        show_pop_boundaries: bool = True) -> go.Figure:
+def build_plotly_figure(
+    res: PlotCorResResult,
+    title: str,
+    fid: Optional[Sequence[str]] = None,
+    iid: Optional[Sequence[str]] = None,
+    color_palette: Sequence[str] = ("#001260", "#EAEDE9", "#601200"),
+    show_pop_boundaries: bool = True,
+    show_pop_labels: bool = True,
+    max_labels: int = 60,
+    show_y_labels: bool = True,
+) -> go.Figure:
     """
     Plotly heatmap matching base R image(t(mat)) orientation:
       - Use transpose for z
       - Reverse y axis
     Hover indicates whether cell is individual (lower) or pop-mean (upper).
+
+    Pop labels:
+      - Adds one tick per population block at the block midpoint (prevents overlap).
+      - If there are too many populations, labels are downsampled.
     """
     z = res.z_plot.copy()
     z_raw = res.z_raw
@@ -349,7 +358,7 @@ def build_plotly_figure(res: PlotCorResResult,
                     f"Value: {val:.6g}{extra}"
                 )
 
-    # Mask diagonal for heatmap; overlay it as black points
+    # Mask diagonal for heatmap; overlay as black points
     z_heat = z.copy()
     np.fill_diagonal(z_heat, np.nan)
 
@@ -377,7 +386,6 @@ def build_plotly_figure(res: PlotCorResResult,
         )
     )
 
-    # Diagonal in black
     fig.add_trace(
         go.Scatter(
             x=np.arange(N),
@@ -389,28 +397,70 @@ def build_plotly_figure(res: PlotCorResResult,
         )
     )
 
-    if show_pop_boundaries:
-        uniq = unique_preserve_order(pop)
-        counts = [int(np.sum(pop == u)) for u in uniq]
-        cuts = np.cumsum(counts)
-        for c in cuts[:-1]:
-            pos = c - 0.5
-            fig.add_shape(type="line", x0=pos, x1=pos, y0=-0.5, y1=N - 0.5,
-                          line=dict(color="black", width=1))
-            fig.add_shape(type="line", x0=-0.5, x1=N - 0.5, y0=pos, y1=pos,
-                          line=dict(color="black", width=1))
+    # --- Pop boundaries + block-midpoint ticks ---
+    tickvals: List[float] = []
+    ticktext: List[str] = []
+
+    if show_pop_boundaries or show_pop_labels:
+        # pop is contiguous by construction after ordering; find block runs
+        pop_arr = np.asarray(pop, dtype=str)
+        uniq = unique_preserve_order(pop_arr)
+
+        # counts in order of appearance (contiguous blocks)
+        counts = [int(np.sum(pop_arr == u)) for u in uniq]
+        starts = np.concatenate(([0], np.cumsum(counts)[:-1]))
+        ends = np.cumsum(counts) - 1
+        mids = (starts + ends) / 2.0
+
+        if show_pop_boundaries:
+            cuts = np.cumsum(counts)
+            for c in cuts[:-1]:
+                pos = c - 0.5
+                fig.add_shape(type="line", x0=pos, x1=pos, y0=-0.5, y1=N - 0.5,
+                              line=dict(color="black", width=1))
+                fig.add_shape(type="line", x0=-0.5, x1=N - 0.5, y0=pos, y1=pos,
+                              line=dict(color="black", width=1))
+
+        if show_pop_labels:
+            # Downsample labels if too many populations
+            n_pops = len(uniq)
+            if n_pops > max_labels and max_labels > 0:
+                step = int(np.ceil(n_pops / max_labels))
+                keep = np.arange(0, n_pops, step)
+            else:
+                keep = np.arange(n_pops)
+
+            tickvals = [float(mids[i]) for i in keep]
+            ticktext = [str(uniq[i]) for i in keep]
 
     fig.update_layout(
         title=title,
         width=900,
         height=900,
-        xaxis=dict(showticklabels=False, range=[-0.5, N - 0.5]),
-        yaxis=dict(showticklabels=False, range=[N - 0.5, -0.5]),  # reverse like R image
-        margin=dict(l=40, r=40, t=60, b=40),
+        margin=dict(l=80 if (show_pop_labels and show_y_labels) else 40,
+                    r=40, t=60, b=120 if show_pop_labels else 40),
+        xaxis=dict(
+            range=[-0.5, N - 0.5],
+            tickmode="array" if tickvals else "auto",
+            tickvals=tickvals if tickvals else None,
+            ticktext=ticktext if ticktext else None,
+            tickangle=90 if ticktext else 0,
+            tickfont=dict(size=10),
+            showgrid=False,
+            zeroline=False,
+        ),
+        yaxis=dict(
+            range=[N - 0.5, -0.5],  # reverse like R image
+            tickmode="array" if (tickvals and show_y_labels) else "auto",
+            tickvals=tickvals if (tickvals and show_y_labels) else None,
+            ticktext=ticktext if (ticktext and show_y_labels) else None,
+            tickfont=dict(size=10),
+            showgrid=False,
+            zeroline=False,
+        ),
     )
 
     return fig
-
 
 # ----------------------------
 # Discovery: group corres by K from filename
