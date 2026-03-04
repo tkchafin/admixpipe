@@ -13,6 +13,7 @@ include { BCFTOOLS_QUERY as BCFTOOLS_QUERY_POST } from '../../modules/local/bcft
 include { POP_SUMMARY } from '../../modules/local/report/pop_summary.nf'
 include { PLOT_PAIRWISE_FST } from '../../modules/local/report/pairwise_fst.nf'
 include { PLOT_PCA } from '../../modules/local/report/plot_pca.nf'
+include { PLOT_EVALADMIX } from '../../modules/local/report/plot_evaladmix.nf'
 include { STAGE_GEODATA_LAYERS } from '../../modules/local/report/stage_geodata.nf'
 
 workflow GENERATE_REPORT {
@@ -30,6 +31,9 @@ workflow GENERATE_REPORT {
     clumpp
     inds
     pops
+    qfilepaths
+    corres
+    fam
     site_coords
     geo_data
     geo_data_dir
@@ -84,24 +88,26 @@ workflow GENERATE_REPORT {
             ch_mqc_files = ch_mqc_files.mix( PLOT_ADMIXTURE_SPATIAL.out.plot_html )
             ch_versions = ch_versions.mix( PLOT_ADMIXTURE_SPATIAL.out.versions )
 
-            PLOT_ADMIXTURE_KRIGING(
-                clumpp,
-                inds,
-                pops,
-                site_coords,
-                STAGE_GEODATA_LAYERS.out.geo_data_dir
-            )
-            ch_mqc_files = ch_mqc_files.mix( PLOT_ADMIXTURE_KRIGING.out.html_discrete )
-                .mix( PLOT_ADMIXTURE_KRIGING.out.html_simpson )
-            ch_versions = ch_versions.mix( PLOT_ADMIXTURE_KRIGING.out.versions )
+            if (params.kriging){
+                PLOT_ADMIXTURE_KRIGING(
+                    clumpp,
+                    inds,
+                    pops,
+                    site_coords,
+                    STAGE_GEODATA_LAYERS.out.geo_data_dir
+                )
+                ch_mqc_files = ch_mqc_files.mix( PLOT_ADMIXTURE_KRIGING.out.html_discrete )
+                    .mix( PLOT_ADMIXTURE_KRIGING.out.html_simpson )
+                ch_versions = ch_versions.mix( PLOT_ADMIXTURE_KRIGING.out.versions )
 
-            PLOT_ADMIXTURE_KRIGING_MULTIK(
-                best_results,
-                inds,
-                pops,
-                site_coords,
-                STAGE_GEODATA_LAYERS.out.geo_data_dir
-            )
+                PLOT_ADMIXTURE_KRIGING_MULTIK(
+                    best_results,
+                    inds,
+                    pops,
+                    site_coords,
+                    STAGE_GEODATA_LAYERS.out.geo_data_dir
+                )
+            }
 
             //ADMIXTURE maps (all K)
             PLOT_ADMIXTURE_SPATIAL_MULTIK(
@@ -125,24 +131,26 @@ workflow GENERATE_REPORT {
             ch_mqc_files = ch_mqc_files.mix( PLOT_ADMIXTURE_SPATIAL.out.plot_html )
             ch_versions = ch_versions.mix( PLOT_ADMIXTURE_SPATIAL.out.versions )
 
-            PLOT_ADMIXTURE_KRIGING(
-                clumpp,
-                inds,
-                pops,
-                site_coords,
-                tuple( [], [] )
-            )
-            ch_mqc_files = ch_mqc_files.mix( PLOT_ADMIXTURE_KRIGING.out.html_discrete )
-                .mix( PLOT_ADMIXTURE_KRIGING.out.html_simpson )
-            ch_versions = ch_versions.mix( PLOT_ADMIXTURE_KRIGING.out.versions )
+            if (params.kriging){
+                PLOT_ADMIXTURE_KRIGING(
+                    clumpp,
+                    inds,
+                    pops,
+                    site_coords,
+                    tuple( [], [] )
+                )
+                ch_mqc_files = ch_mqc_files.mix( PLOT_ADMIXTURE_KRIGING.out.html_discrete )
+                    .mix( PLOT_ADMIXTURE_KRIGING.out.html_simpson )
+                ch_versions = ch_versions.mix( PLOT_ADMIXTURE_KRIGING.out.versions )
 
-            PLOT_ADMIXTURE_KRIGING_MULTIK(
-                best_results,
-                inds,
-                pops,
-                site_coords,
-                tuple( [], [] )
-            )
+                PLOT_ADMIXTURE_KRIGING_MULTIK(
+                    best_results,
+                    inds,
+                    pops,
+                    site_coords,
+                    tuple( [], [] )
+                )
+            }
 
             PLOT_ADMIXTURE_SPATIAL_MULTIK(
                 best_results,
@@ -158,9 +166,9 @@ workflow GENERATE_REPORT {
     }
 
     //EvalAdmix (best and all K)
-    //
-    //
-    //
+    PLOT_EVALADMIX( qfilepaths, fam, corres, bestk_file)
+    ch_mqc_files = ch_mqc_files.mix( PLOT_EVALADMIX.out.allk_html )
+    ch_mqc_files = ch_mqc_files.mix( PLOT_EVALADMIX.out.bestk_html )
 
     //Get individual lists from vcfs
     BCFTOOLS_QUERY_PRE( vcf_pre, tbi_pre )

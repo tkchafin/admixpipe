@@ -486,20 +486,11 @@ def main():
         z = df_sites[name].to_numpy(float)
         tasks.append((name, x, y, z, xs, ys, method))
 
-    # Parallel kriging across K
-    from concurrent.futures import ProcessPoolExecutor, as_completed
+    # SERIAL kriging across K (no multiprocessing)
     bands = {}
-    n_jobs = args.jobs if args.jobs != 0 else max(1, min(len(tasks), (os.cpu_count() or 4) - 1))
-    if n_jobs == 1:
-        for t in tasks:
-            nm, grid = krige_one_band(t)
-            bands[nm] = grid
-    else:
-        with ProcessPoolExecutor(max_workers=n_jobs) as ex:
-            futures = {ex.submit(krige_one_band, t): t[0] for t in tasks}
-            for fut in as_completed(futures):
-                nm, grid = fut.result()
-                bands[nm] = grid
+    for t in tasks:
+        nm, grid = krige_one_band(t)
+        bands[nm] = grid
 
     # Stack and light renorm
     stack = np.stack([bands[n] for n in cluster_cols], axis=0)  # (K, ny, nx)

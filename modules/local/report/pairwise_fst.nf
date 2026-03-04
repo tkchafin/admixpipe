@@ -16,8 +16,8 @@ process PLOT_PAIRWISE_FST {
 
     """
     echo "🔍 Finding input files..."
-    fst=\$(find -L ${snpio_report_data} -type f -name 'pairwise_WC_fst.txt' | head -n1)
-    pvals=\$(find -L ${snpio_report_data} -type f -name 'pairwise_WC_fst_pvalues.txt' | head -n1)
+    fst=\$(find -L ${snpio_report_data} -type f -name 'wc_fst_permutation_observed.txt' | head -n1)
+    pvals=\$(find -L ${snpio_report_data} -type f -name 'wc_fst_permutation_pvalues.txt' | head -n1)
 
     echo "📊 Plotting..."
     plot_pairwise_fst.py \\

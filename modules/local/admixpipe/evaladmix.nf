@@ -21,6 +21,7 @@ process EVALADMIX {
     tuple val(meta), path("[1-9]*.png"), emit: majorclust_png
     tuple val(meta), path("*MinClust*.png"), optional:true, emit: minorclust_png
     tuple val(meta), path("${meta.id}*.png"), emit: reps_png
+    tuple val(meta), path("${meta.id}*.fam"), emit: fam
     path "versions.yml",  emit: versions
 
     script:

@@ -30,7 +30,7 @@ process PLOT_ADMIXTURE_KRIGING {
         --out_prefix   admixture \\
         --template_disc   ${baseDir}/assets/multiqc_kriging_discrete.html \\
         --template_div    ${baseDir}/assets/multiqc_kriging_simpson.html \\
-        --grid_nx 500 --grid_ny 500 \\
+        --grid_nx 400 --grid_ny 400 \\
         --jobs ${task.cpus} \\
         ${geo_data_arg} \\
         ${args}

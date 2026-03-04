@@ -104,5 +104,8 @@ workflow RUN_ADMIXPIPE {
     inds         = ADMIXTUREPIPELINE.out.inds
     pops         = ADMIXTUREPIPELINE.out.pops
     cv_file      = CVSUM.out.cv_output
+    qfilepaths   = DISTRUCT.out.qfilepaths_json
+    corres       = EVALADMIX.out.corres
+    fam          = EVALADMIX.out.fam
     versions     = ch_versions
 }

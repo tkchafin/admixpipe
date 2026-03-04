@@ -4,19 +4,19 @@ Spatial kriging of ADMIXTURE average ancestry proportions → GeoTIFFs + MultiQC
 ---------------------------------------------------------------------------------------------------
 * EXACT SAME parsing as your pie-chart script (Q/inds/pops/coords + overlays)
 * Reads multiple K solutions from a CLUMPP directory (ClumppIndFile.output.K)
-* Kriging per K (PyKrige spherical if available; falls back to IDW), optionally parallel
+* Kriging per K (PyKrige exponential, theta≈fields::Krig range; falls back to IDW), strictly serial
 * Folium HTML maps on Leaflet basemaps (no axes), with:
     - auto-fit to raster extent
     - overlays from --geo_data_json (styled; optional z_order respected)
     - north arrow (↑ N) and styled scale bar
     - drop-down selector for K that toggles radio-style layers via LayerControl
-* Outputs:
+* Outputs (SAME FILENAMES, now true-color RGB to match Plotly):
   - GeoTIFFs: one set per K into --geotiff_dir, each prefixed "K#_"
-      - K#_<prefix>_kriging_discrete.tif        (UInt8/UInt16; 0=nodata, 1..K=argmax)
-      - K#_<prefix>_kriging_simpson.tif         (Float32; nodata=-9999)
+      - K#_<prefix>_kriging_discrete.tif        (RGB UInt8; colors baked in)
+      - K#_<prefix>_kriging_simpson.tif         (RGB UInt8; viridis baked in)
   - HTML (Multi-K in one map each; K chosen via dropdown):
-      - <prefix>_kriging_discrete_multiK.html
-      - <prefix>_kriging_simpson_multiK.html
+      - <prefix>_kriging_discrete.html
+      - <prefix>_kriging_simpson.html
   - <prefix>.tsv                                (site summary; from first K loaded)
 """
 import argparse, json, re, io, base64, sys, os, warnings
@@ -31,7 +31,7 @@ from shapely.ops import unary_union
 import folium
 from branca.element import Element
 
-# Colormaps for PNG generation
+# Colormaps for PNG/arrays
 import matplotlib.cm as mplcm
 import matplotlib.colors as mplcolors
 
@@ -48,7 +48,10 @@ def try_pykrige():
         return False
 
 def encode_png(arr_uint8):
-    """Encode (H,W,3|4) uint8 → base64 PNG (Pillow preferred; mpl fallback)."""
+    """
+    Encode a (H,W,3) RGB or (H,W,4) RGBA uint8 array to base64 PNG.
+    Tries Pillow; falls back to matplotlib.
+    """
     try:
         from PIL import Image  # type: ignore
         mode = "RGBA" if arr_uint8.shape[-1] == 4 else "RGB"
@@ -78,20 +81,18 @@ def parse_clumpp(dir_path: str, kmin=None, kmax=None):
             results[K] = f
     return dict(sorted(results.items()))
 
-# === IMPORTANT: loader identical to your working pie-chart script ===
 def load_q_ind_pop(qmat_file, ind_file, pop_file):
     q = pd.read_csv(qmat_file, sep=":", header=None, dtype=str, engine="python")
     df = q[1].astype(str).str.strip().str.split(expand=True).astype(float)
-
     inds = pd.read_csv(ind_file, header=None, names=["Individual"])["Individual"]
     pops = pd.read_csv(pop_file, header=None, names=["Population"])["Population"]
     if not (len(df) == len(inds) == len(pops)):
         raise ValueError("Length mismatch among Q, inds, pops")
-
     df.columns = [f"Cluster {i+1}" for i in range(df.shape[1])]
     df["Individual"] = inds.values
     df["Population"] = pops.values
     return df
+
 def load_coords(path):
     return pd.read_csv(path, sep="\t", header=None, names=["ID","Latitude","Longitude"])
 
@@ -163,11 +164,12 @@ def krige_one_band(args):
     if method == "pykrige":
         try:
             from pykrige.ok import OrdinaryKriging
+            # Emulate fields::Krig with exponential covariance; theta ≈ range parameter
             OK = OrdinaryKriging(
                 x, y, z,
-                variogram_model="spherical",
-                verbose=False, enable_plotting=False,
-                coordinates_type="euclidean"
+                variogram_model="exponential",
+                variogram_parameters=[1.0, float(args_global.theta), float(args_global.nugget)],  # [sill, range, nugget]
+                verbose=False
             )
             zhat, _ = OK.execute("grid", xs, ys)
             grid = np.asarray(zhat, dtype=float)
@@ -212,25 +214,28 @@ def grid_edges(xs, ys):
     return x_edges, y_edges
 
 # ─────────────── GeoTIFF writers ───────────────
-def write_geotiff_multiband(xs, ys, stack, band_names, path, nodata=-9999.0):
-    bands, ny, nx = stack.shape
+def write_rgb_geotiff(xs, ys, rgb_uint8, path, mask_alpha=None):
+    # rgb_uint8: (ny, nx, 3) uint8 in array orientation; will flip for raster origin
+    ny, nx, _ = rgb_uint8.shape
     x_edges, y_edges = grid_edges(xs, ys)
     west, south, east, north = x_edges[0], y_edges[0], x_edges[-1], y_edges[-1]
     transform = from_bounds(west, south, east, north, nx, ny)
-    data = np.where(np.isfinite(stack), stack, nodata).astype("float32")
-    data = data[:, ::-1, :]
+    arr = rgb_uint8[::-1, :, :]  # GDAL top-left origin
+    r, g, b = arr[..., 0], arr[..., 1], arr[..., 2]
     with rasterio.open(
         path, "w",
         driver="GTiff",
-        height=ny, width=nx, count=bands,
-        dtype="float32", crs="EPSG:4326", transform=transform,
-        nodata=nodata, tiled=True, compress="deflate", predictor=3
+        height=ny, width=nx, count=3,
+        dtype="uint8", crs="EPSG:4326", transform=transform,
+        tiled=True, compress="deflate", photometric="RGB"
     ) as dst:
-        for i in range(bands):
-            dst.write(data[i], i+1)
-            dst.set_band_description(i+1, band_names[i])
+        dst.write(r, 1); dst.write(g, 2); dst.write(b, 3)
+        if mask_alpha is not None:
+            m = (mask_alpha[::-1, :] > 0).astype("uint8") * 255
+            dst.write_mask(m)
 
 def write_geotiff_single(xs, ys, band, path, dtype, nodata, colormap=None, descr=None):
+    # kept for completeness; not used now that we write RGB to match Plotly exactly
     ny, nx = band.shape
     x_edges, y_edges = grid_edges(xs, ys)
     west, south, east, north = x_edges[0], y_edges[0], x_edges[-1], y_edges[-1]
@@ -252,8 +257,8 @@ def write_geotiff_single(xs, ys, band, path, dtype, nodata, colormap=None, descr
         if (colormap is not None) and (_dtype == "uint8"):
             dst.write_colormap(1, colormap)
 
-# ───────────────────────── image encoding for Folium overlays ─────────────────────────
-def scalar_to_rgba_png(z, vmin=0.0, vmax=1.0, cmap_name="viridis", alpha=220):
+# ───────────────────────── image encoding + array builders ─────────────────────────
+def scalar_to_rgba_array(z, vmin=0.0, vmax=1.0, cmap_name="viridis", alpha=220):
     cmap = mplcm.get_cmap(cmap_name)
     norm = mplcolors.Normalize(vmin=vmin, vmax=vmax, clip=True)
     z_mask = np.isfinite(z)
@@ -263,10 +268,13 @@ def scalar_to_rgba_png(z, vmin=0.0, vmax=1.0, cmap_name="viridis", alpha=220):
         rgba[z_mask] = mapped[z_mask]
         rgba[z_mask, 3] = alpha
         rgba[~z_mask, 3] = 0
-    rgba = rgba[::-1, :, :]
-    return "data:image/png;base64," + encode_png(rgba)
+    return rgba  # not flipped here
 
-def classes_to_rgba_png(classes, class_hex, nodata_val=0, alpha=230):
+def scalar_to_rgba_png(z, vmin=0.0, vmax=1.0, cmap_name="viridis", alpha=220):
+    rgba = scalar_to_rgba_array(z, vmin=vmin, vmax=vmax, cmap_name=cmap_name, alpha=alpha)
+    return "data:image/png;base64," + encode_png(rgba[::-1, :, :])
+
+def classes_to_rgba_array(classes, class_hex, nodata_val=0, alpha=230):
     ny, nx = classes.shape
     rgba = np.zeros((ny, nx, 4), dtype=np.uint8)
     for idx, hx in enumerate(class_hex, start=1):
@@ -274,8 +282,11 @@ def classes_to_rgba_png(classes, class_hex, nodata_val=0, alpha=230):
         mask = classes == idx
         rgba[mask, 0] = r; rgba[mask, 1] = g; rgba[mask, 2] = b; rgba[mask, 3] = alpha
     rgba[classes == nodata_val, 3] = 0
-    rgba = rgba[::-1, :, :]
-    return "data:image/png;base64," + encode_png(rgba)
+    return rgba  # not flipped here
+
+def classes_to_rgba_png(classes, class_hex, nodata_val=0, alpha=230):
+    rgba = classes_to_rgba_array(classes, class_hex, nodata_val, alpha)
+    return "data:image/png;base64," + encode_png(rgba[::-1, :, :])
 
 # ───────────────────────── Folium map builders (HTML only) ─────────────────────────
 def _styled_map(basemap_name, center_lat, center_lon):
@@ -353,7 +364,7 @@ def add_dropdown_for_k(m, k_values, label_text="Model (K)"):
 </script>
 """))
 
-# ───────────────────────── main ─────────────────────────
+# ───────────────────────── main (serial, multi-K) ─────────────────────────
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--indir",       required=True)
@@ -374,10 +385,22 @@ def main():
     ap.add_argument("--grid_nx",     type=int, default=400)
     ap.add_argument("--grid_ny",     type=int, default=400)
     ap.add_argument("--no_pykrige",  action="store_true")
-    ap.add_argument("--jobs",        type=int, default=0)
-    ap.add_argument("--merge_thresh", type=float, default=0.5)  # API compat (unused)
-    ap.add_argument("--merge_margin", type=float, default=0.0)  # API compat (unused)
+    # TESS-like kriging controls (good defaults):
+    ap.add_argument("--theta",  type=float, default=None,
+                    help="Exponential variogram range (≈ fields::Krig theta). If unset, auto = 0.3 * max(map span).")
+    ap.add_argument("--nugget", type=float, default=1e-10,
+                    help="Variogram nugget (very small keeps surfaces smooth).")
+    ap.add_argument("--majority_px", type=int, default=2,
+                    help="Post-classification majority filter radius in pixels (0 disables).")
     args = ap.parse_args()
+
+    # expose selected params to krige_one_band / postproc without changing call signatures
+    class _ArgsGlobal: pass
+    global args_global
+    args_global = _ArgsGlobal()
+    args_global.theta = args.theta   # finalized after bounds known
+    args_global.nugget = args.nugget
+    args_global.majority_px = args.majority_px
 
     prefix = Path(args.out_prefix)
     html_outdir  = Path(args.out_dir) if args.out_dir else prefix.parent
@@ -409,18 +432,50 @@ def main():
     df_sites0[["ID","Latitude","Longitude","count"] + cluster_cols0].to_csv(tsv_path, sep="\t", index=False)
     print(f"✅ Site summary TSV saved to: {tsv_path}")
 
+    # Grid + map bounds
     bounds = compute_bounds(df_sites0, overlays)
     xs, ys, xx, yy = build_grid(bounds, args.grid_nx, args.grid_ny)
     x_edges, y_edges = grid_edges(xs, ys)
     west, south, east, north = x_edges[0], y_edges[0], x_edges[-1], y_edges[-1]
     map_bounds = (west, south, east, north)
 
+    # finalize theta if None: ~30% of max span for smoothness
+    if args_global.theta is None:
+        xmin, ymin, xmax, ymax = bounds
+        span = max(xmax - xmin, ymax - ymin)
+        args_global.theta = 0.3 * span
+
     method = "pykrige" if (not args.no_pykrige and try_pykrige()) else "idw"
     if method == "idw":
         print("ℹ️ PyKrige unavailable/disabled; using IDW fallback.", file=sys.stderr)
 
     disc_layers, simp_layers = [], []
-    from concurrent.futures import ProcessPoolExecutor, as_completed
+
+    # small helper: optional majority filter (no ambiguous/zero labels)
+    def apply_majority_filter(labels, K, r):
+        if r <= 0:
+            return labels
+        try:
+            from scipy.ndimage import generic_filter
+            yy, xx = np.ogrid[-r:r+1, -r:r+1]
+            footprint = (xx*xx + yy*yy) <= (r*r)
+
+            def _mode_filter(window):
+                vals = window.astype(np.uint16)
+                m = np.bincount(vals, minlength=K+1)  # labels 0..K (but we avoid 0 elsewhere)
+                if m[1:].max() >= m[0]:
+                    return np.argmax(m[1:]) + 1
+                return np.argmax(m[1:]) + 1
+            return generic_filter(labels.astype(np.uint16), _mode_filter, footprint=footprint, mode="nearest")
+        except Exception:
+            pad = np.pad(labels, 1, mode="edge")
+            out = labels.copy()
+            for i in range(labels.shape[0]):
+                for j in range(labels.shape[1]):
+                    block = pad[i:i+3, j:j+3].ravel()
+                    m = np.bincount(block, minlength=K+1)
+                    out[i, j] = np.argmax(m[1:]) + 1
+            return out
 
     for K in Ks:
         qpath = kfiles[K]
@@ -434,17 +489,9 @@ def main():
         tasks = [(name, x, y, df_sites[name].to_numpy(float), xs, ys, method) for name in cluster_cols]
 
         bands = {}
-        n_jobs = args.jobs if args.jobs != 0 else max(1, min(len(tasks), (os.cpu_count() or 4) - 1))
-        if n_jobs == 1:
-            for t in tasks:
-                nm, grid = krige_one_band(t)
-                bands[nm] = grid
-        else:
-            with ProcessPoolExecutor(max_workers=n_jobs) as ex:
-                futures = {ex.submit(krige_one_band, t): t[0] for t in tasks}
-                for fut in as_completed(futures):
-                    nm, grid = fut.result()
-                    bands[nm] = grid
+        for t in tasks:
+            nm, grid = krige_one_band(t)
+            bands[nm] = grid
 
         stack = np.stack([bands[n] for n in cluster_cols], axis=0)
         stack = np.clip(stack, 0.0, 1.0)
@@ -454,39 +501,44 @@ def main():
             if np.any(over):
                 stack[:, over[0]] = stack[:, over[0]] / sums[:, over[0]]
 
-        argmax_idx = np.nanargmax(stack, axis=0)
-        all_nan = np.all(~np.isfinite(stack), axis=0)
-        disc = (argmax_idx + 1).astype(np.uint32)
-        disc[all_nan] = 0
+        # robust argmax (never produce ambiguous/zero)
+        any_valid = np.any(np.isfinite(stack), axis=0)
+        tmp = np.where(np.isfinite(stack), stack, -np.inf)
+        argmax_idx = np.argmax(tmp, axis=0)          # 0..K-1
+        disc = (argmax_idx + 1).astype(np.uint32)    # 1..K
+        if not any_valid.all():
+            disc[~any_valid] = disc[any_valid].min() if np.any(any_valid) else 1
+        if args_global.majority_px > 0:
+            disc = apply_majority_filter(disc, K, args_global.majority_px)
 
         simpson = simpson_diversity(stack)
 
         base = f"K{K}_{stem}"
         colors = colors_by_k[K]
 
-        def _hex_to_rgb(h): return tuple(int(h[i:i+2], 16) for i in (1,3,5))
-
-        if K <= 255:
-            disc8 = disc.astype("uint8")
-            cmap = {i: _hex_to_rgb(colors[i-1]) for i in range(1, K+1)}
-            write_geotiff_single(xs, ys, disc8, str(geotiff_dir / f"{base}_kriging_discrete.tif"),
-                                 dtype="uint8", nodata=0, colormap=cmap, descr="Kmax (1..K)")
-        else:
-            disc16 = disc.astype("uint16")
-            write_geotiff_single(xs, ys, disc16, str(geotiff_dir / f"{base}_kriging_discrete.tif"),
-                                 dtype="uint16", nodata=0, colormap=None, descr="Kmax (1..K)")
-        print(f"✅ GeoTIFF (discrete argmax): {geotiff_dir / f'{base}_kriging_discrete.tif'}")
-
-        write_geotiff_single(xs, ys, simpson, str(geotiff_dir / f"{base}_kriging_simpson.tif"),
-                             dtype="float32", nodata=-9999.0, descr="Simpson diversity")
-        print(f"✅ GeoTIFF (Simpson diversity): {geotiff_dir / f'{base}_kriging_simpson.tif'}")
-
-        url_disc = classes_to_rgba_png(disc.astype(int), class_hex=colors, nodata_val=0, alpha=230)
-        vmin = float(np.nanmin(simpson)) if np.isfinite(simpson).any() else 0.0
-        vmax = float(np.nanmax(simpson)) if np.isfinite(simpson).any() else 1.0
+        # Build the SAME RGBA arrays used for the Plotly/Folium overlays
+        disc_rgba = classes_to_rgba_array(disc.astype(int), class_hex=colors, nodata_val=0, alpha=255)
+        disc_rgb = disc_rgba[..., :3]
+        finite = np.isfinite(simpson)
+        vmin = float(np.nanmin(simpson[finite])) if finite.any() else 0.0
+        vmax = float(np.nanmax(simpson[finite])) if finite.any() else 1.0
         if not np.isfinite(vmin) or not np.isfinite(vmax) or abs(vmax - vmin) < 1e-9:
             vmin, vmax = 0.0, 1.0
-        url_div  = scalar_to_rgba_png(simpson, vmin=vmin, vmax=vmax, cmap_name="viridis", alpha=220)
+        sim_rgba = scalar_to_rgba_array(simpson, vmin=vmin, vmax=vmax, cmap_name="viridis", alpha=255)
+        sim_rgb = sim_rgba[..., :3]
+
+        # Write EXACT visual as RGB GeoTIFFs, keeping SAME FILENAMES
+        write_rgb_geotiff(xs, ys, disc_rgb, str(geotiff_dir / f"{base}_kriging_discrete.tif"),
+                          mask_alpha=disc_rgba[..., 3])
+        print(f"✅ GeoTIFF (discrete argmax, RGB): {geotiff_dir / f'{base}_kriging_discrete.tif'}")
+
+        write_rgb_geotiff(xs, ys, sim_rgb, str(geotiff_dir / f"{base}_kriging_simpson.tif"),
+                          mask_alpha=sim_rgba[..., 3])
+        print(f"✅ GeoTIFF (Simpson diversity, RGB): {geotiff_dir / f'{base}_kriging_simpson.tif'}")
+
+        # HTML overlays (same visuals)
+        url_disc = "data:image/png;base64," + encode_png(disc_rgba[::-1, :, :])
+        url_div  = "data:image/png;base64," + encode_png(sim_rgba[::-1, :, :])
 
         disc_layers.append((K, url_disc))
         simp_layers.append((K, url_div))

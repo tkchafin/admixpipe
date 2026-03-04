@@ -80,6 +80,9 @@ workflow ADMIXPIPE {
         RUN_ADMIXPIPE.out.bestK_clumpp,
         RUN_ADMIXPIPE.out.inds,
         RUN_ADMIXPIPE.out.pops,
+        RUN_ADMIXPIPE.out.qfilepaths,
+        RUN_ADMIXPIPE.out.corres,
+        RUN_ADMIXPIPE.out.fam,
         ch_site_coords,
         ch_geo_data,
         ch_geo_data_dir

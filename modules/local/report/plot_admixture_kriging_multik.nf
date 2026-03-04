@@ -31,8 +31,8 @@ process PLOT_ADMIXTURE_KRIGING_MULTIK {
         --geotiff_dir    "geotiff" \\
         --template_disc   ${baseDir}/assets/multiqc_kriging_discrete_multik.html \\
         --template_div    ${baseDir}/assets/multiqc_kriging_simpson_multik.html \\
-        --grid_nx 500 --grid_ny 500 \\
-        --jobs ${task.cpus} \\
+        --grid_nx 400 --grid_ny 400 \\
+        --jobs 1 \\
         ${geo_data_arg} \\
         ${args}
 
