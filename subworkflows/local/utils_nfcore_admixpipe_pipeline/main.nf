@@ -236,11 +236,105 @@ workflow PIPELINE_COMPLETION {
 // Check and validate pipeline parameters
 //
 def validateInputParameters() {
-    // Validate maxk is an integer
+
+    // -------------------------
+    // maxk
+    // -------------------------
     if (!(params.maxk instanceof Integer)) {
-        log.error "Invalid value for --maxk: '${params.maxk}'. It must be an integer."
+        try {
+            params.maxk = params.maxk as Integer
+        } catch (Exception e) {
+            log.error "Invalid value for --maxk: '${params.maxk}'. It must be an integer."
+            System.exit(1)
+        }
+    }
+
+    if (params.maxk <= 1) {
+        log.error "Invalid value for --maxk: '${params.maxk}'. It must be > 1."
+        System.exit(1)
+    }
+
+    // -------------------------
+    // Coverage parameters
+    // -------------------------
+    ['ind_cov','snp_cov','pop_cov','min_maf'].each { p ->
+        if (!(params[p] instanceof Number)) {
+            try {
+                params[p] = params[p] as Double
+            } catch (Exception e) {
+                log.error "Invalid value for --${p}: '${params[p]}'. It must be numeric."
+                System.exit(1)
+            }
+        }
+
+        if (params[p] < 0 || params[p] > 1) {
+            log.error "Invalid value for --${p}: '${params[p]}'. Must be between 0 and 1."
+            System.exit(1)
+        }
+    }
+
+    // -------------------------
+    // thin_dist
+    // -------------------------
+    if (!(params.thin_dist instanceof Integer)) {
+        try {
+            params.thin_dist = params.thin_dist as Integer
+        } catch (Exception e) {
+            log.error "Invalid value for --thin_dist: '${params.thin_dist}'. It must be an integer."
+            System.exit(1)
+        }
+    }
+
+    // -------------------------
+    // num_cv
+    // -------------------------
+    if (!(params.num_cv instanceof Integer)) {
+        try {
+            params.num_cv = params.num_cv as Integer
+        } catch (Exception e) {
+            log.error "Invalid value for --num_cv: '${params.num_cv}'. It must be an integer."
+            System.exit(1)
+        }
+    }
+
+    // -------------------------
+    // num_reps
+    // -------------------------
+    if (!(params.num_reps instanceof Integer)) {
+        try {
+            params.num_reps = params.num_reps as Integer
+        } catch (Exception e) {
+            log.error "Invalid value for --num_reps: '${params.num_reps}'. It must be an integer."
+            System.exit(1)
+        }
+    }
+
+    // -------------------------
+    // kriging (not supported yet)
+    // -------------------------
+    if (params.kriging) {
+        log.error "The --kriging option is not currently supported. Please set --kriging false."
+        System.exit(1)
+    }
+
+    // -------------------------
+    // bestk_method
+    // -------------------------
+    def allowedBestK = ["cv","lnl","l1","l2","evanno"]
+
+    if (params.bestk_method == null) {
+        log.error "Parameter --bestk_method cannot be null."
+        System.exit(1)
+    }
+
+    params.bestk_method = params.bestk_method.toString().toLowerCase()
+
+    if (!allowedBestK.contains(params.bestk_method)) {
+        log.error "Invalid value for --bestk_method: '${params.bestk_method}'. Allowed values: ${allowedBestK.join(', ')}"
+        System.exit(1)
     }
 }
+
 //
 // Generate methods description for MultiQC
 //
