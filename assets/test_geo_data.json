@@ -1,0 +1,11 @@
+[
+  {
+    "path": "test_geo_data/streams.gpkg",
+    "z_order": 1,
+    "style": {
+      "color": "#0066ff",
+      "weight": 1,
+      "opacity": 1.0
+    }
+  }
+]

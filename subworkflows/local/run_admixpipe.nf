@@ -92,6 +92,7 @@ workflow RUN_ADMIXPIPE {
     // Fetch results for the best K value
     BESTK(
         CVSUM.out.cv_output,
+        EVANNO.out.metrics,
         DISTRUCT.out.best_results
     )
     ch_versions = ch_versions.mix( BESTK.out.versions )

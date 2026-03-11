@@ -9,7 +9,8 @@ process BESTK {
 
     input:
         tuple val(meta), path(cv_file)
-        tuple val(meta2), path(best_results)
+        tuple val(meta2), path(evanno_metrics)
+        tuple val(meta3), path(best_results)
 
     output:
         tuple val(meta), path('bestK.txt')                        , emit: bestK_file
