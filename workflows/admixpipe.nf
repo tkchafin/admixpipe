@@ -5,10 +5,9 @@
 */
 
 include { MULTIQC                } from '../modules/nf-core/multiqc/main'
-include { paramsSummaryMap       } from 'plugin/nf-validation'
-include { paramsSummaryMultiqc   } from '../subworkflows/nf-core/utils_nfcore_pipeline'
-include { softwareVersionsToYAML } from '../subworkflows/nf-core/utils_nfcore_pipeline'
-include { methodsDescriptionText } from '../subworkflows/local/utils_nfcore_admixpipe_pipeline'
+include { softwareVersionsToYAML   } from '../subworkflows/nf-core/utils_nfcore_pipeline'
+include { methodsDescriptionText   } from '../subworkflows/local/utils_nfcore_admixpipe_pipeline'
+include { fullParamsSummaryMultiqc } from '../subworkflows/local/utils_nfcore_admixpipe_pipeline'
 
 include { SNPIO_FILTER } from '../modules/local/snpio/filter.nf'
 include { RUN_ADMIXPIPE } from '../subworkflows/local/run_admixpipe.nf'
@@ -113,9 +112,7 @@ workflow ADMIXPIPE {
         Channel.fromPath(params.multiqc_logo, checkIfExists: true) :
         Channel.empty()
 
-    summary_params      = paramsSummaryMap(
-        workflow, parameters_schema: "nextflow_schema.json")
-    ch_workflow_summary = Channel.value(paramsSummaryMultiqc(summary_params))
+    ch_workflow_summary = Channel.value(fullParamsSummaryMultiqc("nextflow_schema.json"))
 
     ch_multiqc_custom_methods_description = params.multiqc_methods_description ?
         file(params.multiqc_methods_description, checkIfExists: true) :
@@ -144,7 +141,7 @@ workflow ADMIXPIPE {
     CUSTOMIZE_REPORT( MULTIQC.out.report )
 
     emit:
-    multiqc_report = MULTIQC.out.report.toList() // channel: /path/to/multiqc_report.html
+    multiqc_report = CUSTOMIZE_REPORT.out.report.toList() // channel: /path/to/multiqc_report.html
     versions       = ch_versions                 // channel: [ path(versions.yml) ]
 }
 

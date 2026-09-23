@@ -42,7 +42,6 @@ workflow PIPELINE_INITIALISATION {
     site_coords
     geo_data_config
     geo_data_dir
-    reference
 
     main:
 
@@ -63,7 +62,7 @@ workflow PIPELINE_INITIALISATION {
     //
     pre_help_text = nfCoreLogo(monochrome_logs)
     post_help_text = '\n' + workflowCitation() + '\n' + dashedLine(monochrome_logs)
-    def String workflow_command = "nextflow run ${workflow.manifest.name} -profile <docker/singularity/.../institute> --input input.vcf[.gz] --outdir <OUTDIR>"
+    def String workflow_command = "nextflow run ${workflow.manifest.name} -profile <docker/singularity/.../institute> --input input.vcf[.gz] --popmap popmap.tsv --outdir <OUTDIR>"
     UTILS_NFVALIDATION_PLUGIN (
         help,
         workflow_command,
@@ -318,6 +317,18 @@ def validateInputParameters() {
     }
 
     // -------------------------
+    // geodata layers
+    // -------------------------
+    if (params.geo_data_config && !params.geo_data_dir) {
+        log.error "--geo_data_config requires --geo_data_dir (the directory holding the layer files)."
+        System.exit(1)
+    }
+
+    if (params.geo_data_config && !params.site_coords) {
+        log.warn "--geo_data_config is ignored because --site_coords was not provided."
+    }
+
+    // -------------------------
     // bestk_method
     // -------------------------
     def allowedBestK = ["cv","lnl","l1","l2","evanno"]
@@ -336,29 +347,127 @@ def validateInputParameters() {
 }
 
 //
+// Full parameter summary for MultiQC
+//
+// Unlike paramsSummaryMultiqc (which only lists values that differ from the
+// schema defaults), this lists every schema parameter alongside its default,
+// any parameters passed that are not in the schema, and the exact command
+// line and run configuration.
+//
+def fullParamsSummaryMultiqc(schema_filename) {
+    def schema = new groovy.json.JsonSlurper().parse(file("${workflow.projectDir}/${schema_filename}"))
+
+    def esc = { v ->
+        v == null ? '' : v.toString()
+            .replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+            .replaceAll(/\r?\n/, ' ')
+    }
+    def fmt = { v ->
+        (v == null || v.toString() == '') ? '<span style="color:#999999;">N/A</span>' : "<samp>${esc(v)}</samp>"
+    }
+    def table = { List header, List rows ->
+        def out = ['<table class="table table-condensed table-hover" style="width:auto;">']
+        out << '<thead><tr>' + header.collect { "<th>${it}</th>" }.join('') + '</tr></thead><tbody>'
+        rows.each { row -> out << '<tr>' + row.collect { "<td>${it}</td>" }.join('') + '</tr>' }
+        out << '</tbody></table>'
+        return out
+    }
+
+    def lines = []
+
+    // Run information
+    lines << '<h4>Command line</h4>'
+    lines << "<pre><code>${esc(workflow.commandLine)}</code></pre>"
+    lines << '<h4>Run information</h4>'
+    def run_info = [
+        'Pipeline version' : workflow.manifest.version,
+        'Revision'         : workflow.revision,
+        'Commit ID'        : workflow.commitId,
+        'Run name'         : workflow.runName,
+        'Session ID'       : workflow.sessionId,
+        'Started'          : workflow.start,
+        'Nextflow version' : workflow.nextflow.version,
+        'Profile'          : workflow.profile,
+        'Config files'     : workflow.configFiles?.join(', '),
+        'Container engine' : workflow.containerEngine,
+        'Launch directory' : workflow.launchDir,
+        'Work directory'   : workflow.workDir,
+        'Project directory': workflow.projectDir,
+        'User'             : workflow.userName
+    ]
+    lines.addAll(table(['Field', 'Value'], run_info.collect { k, v -> ["<b>${k}</b>", fmt(v)] }))
+
+    // Parameters, grouped as in the schema
+    lines << '<h4>Parameters</h4>'
+    lines << '<p>Values that differ from the pipeline default are shown in <b>bold</b>.</p>'
+    def seen = [] as Set
+    schema.definitions.each { group_id, group ->
+        def props = group['properties'] ?: [:]
+        if (!props) return
+        def rows = props.collect { name, spec ->
+            seen << name
+            def value   = params.containsKey(name) ? params[name] : null
+            def changed = value?.toString() != spec['default']?.toString()
+            def label   = changed ? "<b>${name}</b>" : name
+            [label, changed ? "<b>${fmt(value)}</b>" : fmt(value), fmt(spec['default'])]
+        }
+        // Pipeline-specific groups are expanded; nf-core boilerplate groups are collapsed
+        def boilerplate = group_id in ['institutional_config_options', 'max_job_request_options', 'generic_options']
+        lines << (boilerplate ? "<details><summary><b>${esc(group.title)}</b></summary>" : "<p style=\"font-size:110%\"><b>${esc(group.title)}</b></p>")
+        lines.addAll(table(['Parameter', 'Value', 'Default'], rows))
+        if (boilerplate) lines << '</details>'
+    }
+
+    // Anything passed that the schema does not know about (e.g. from -params-file)
+    def extra = params.keySet().findAll { !(it in seen) && !it.contains('-') }.sort()
+    if (extra) {
+        lines << '<p style="font-size:110%"><b>Other parameters (not in schema)</b></p>'
+        lines.addAll(table(['Parameter', 'Value'], extra.collect { [it, fmt(params[it])] }))
+    }
+
+    String yaml_file_text  = "id: '${workflow.manifest.name.replace('/','-')}-summary'\n"
+    yaml_file_text        += "description: ' - full command line, run configuration and parameter values for this run.'\n"
+    yaml_file_text        += "section_name: '${workflow.manifest.name} Workflow Summary'\n"
+    yaml_file_text        += "section_href: '${workflow.manifest.homePage}'\n"
+    yaml_file_text        += "plot_type: 'html'\n"
+    yaml_file_text        += "data: |\n"
+    yaml_file_text        += lines.collect { "    ${it}" }.join('\n') + '\n'
+
+    return yaml_file_text
+}
+
+//
 // Generate methods description for MultiQC
 //
 def toolCitationText() {
-    // TODO nf-core: Optionally add in-text citation tools to this list.
-    // Can use ternary operators to dynamically construct based conditions, e.g. params["run_xyz"] ? "Tool (Foo et al. 2023)" : "",
-    // Uncomment function in methodsDescriptionText to render in MultiQC report
     def citation_text = [
-            "Tools used in the workflow included:",
-            "FastQC (Andrews 2010),",
-            "MultiQC (Ewels et al. 2016)",
-            "."
+            "Input genotypes were compressed and indexed with tabix (Li 2011), and sample lists were extracted with bcftools (Danecek et al. 2021).",
+            "SNPs and individuals were filtered, and missingness, F<sub>ST</sub> and PCA summaries were computed, with SNPio (Martin et al.).",
+            "Ancestry proportions were estimated with ADMIXTURE (Alexander et al. 2009) via AdmixPipe (Mussmann et al. 2020, 2023), using VCFtools (Danecek et al. 2011) and PLINK (Chang et al. 2015) for file conversion.",
+            "Replicate runs were aligned with CLUMPAK (Kopelman et al. 2015) and CLUMPP (Jakobsson & Rosenberg 2007), and plotted with distruct (Rosenberg 2004).",
+            "Model fit was assessed with evalAdmix (Garcia-Erill & Albrechtsen 2020), and the best K was chosen using ${params.bestk_method == 'evanno' ? 'the Evanno delta K method (Evanno et al. 2005)' : params.bestk_method == 'cv' ? 'ADMIXTURE cross-validation error' : 'the ' + params.bestk_method + ' criterion (Evanno et al. 2005)'}.",
+            "Results were summarised with MultiQC (Ewels et al. 2016)."
         ].join(' ').trim()
 
     return citation_text
 }
 
 def toolBibliographyText() {
-    // TODO nf-core: Optionally add bibliographic entries to this list.
-    // Can use ternary operators to dynamically construct based conditions, e.g. params["run_xyz"] ? "<li>Author (2023) Pub name, Journal, DOI</li>" : "",
-    // Uncomment function in methodsDescriptionText to render in MultiQC report
     def reference_text = [
-            "<li>Andrews S, (2010) FastQC, URL: https://www.bioinformatics.babraham.ac.uk/projects/fastqc/).</li>",
-            "<li>Ewels, P., Magnusson, M., Lundin, S., & Käller, M. (2016). MultiQC: summarize analysis results for multiple tools and samples in a single report. Bioinformatics , 32(19), 3047–3048. doi: /10.1093/bioinformatics/btw354</li>"
+            "<li>Alexander, D. H., Novembre, J., & Lange, K. (2009). Fast model-based estimation of ancestry in unrelated individuals. Genome Research, 19(9), 1655–1664. doi: <a href='https://doi.org/10.1101/gr.094052.109'>10.1101/gr.094052.109</a></li>",
+            "<li>Chang, C. C., Chow, C. C., Tellier, L. C., Vattikuti, S., Purcell, S. M., & Lee, J. J. (2015). Second-generation PLINK: rising to the challenge of larger and richer datasets. GigaScience, 4, 7. doi: <a href='https://doi.org/10.1186/s13742-015-0047-8'>10.1186/s13742-015-0047-8</a></li>",
+            "<li>Danecek, P., Auton, A., Abecasis, G., et al. (2011). The variant call format and VCFtools. Bioinformatics, 27(15), 2156–2158. doi: <a href='https://doi.org/10.1093/bioinformatics/btr330'>10.1093/bioinformatics/btr330</a></li>",
+            "<li>Danecek, P., Bonfield, J. K., Liddle, J., et al. (2021). Twelve years of SAMtools and BCFtools. GigaScience, 10(2), giab008. doi: <a href='https://doi.org/10.1093/gigascience/giab008'>10.1093/gigascience/giab008</a></li>",
+            "<li>Evanno, G., Regnaut, S., & Goudet, J. (2005). Detecting the number of clusters of individuals using the software STRUCTURE: a simulation study. Molecular Ecology, 14(8), 2611–2620. doi: <a href='https://doi.org/10.1111/j.1365-294X.2005.02553.x'>10.1111/j.1365-294X.2005.02553.x</a></li>",
+            "<li>Ewels, P., Magnusson, M., Lundin, S., & Käller, M. (2016). MultiQC: summarize analysis results for multiple tools and samples in a single report. Bioinformatics, 32(19), 3047–3048. doi: <a href='https://doi.org/10.1093/bioinformatics/btw354'>10.1093/bioinformatics/btw354</a></li>",
+            "<li>Garcia-Erill, G., & Albrechtsen, A. (2020). Evaluation of model fit of inferred admixture proportions. Molecular Ecology Resources, 20(4), 936–949. doi: <a href='https://doi.org/10.1111/1755-0998.13171'>10.1111/1755-0998.13171</a></li>",
+            "<li>Jakobsson, M., & Rosenberg, N. A. (2007). CLUMPP: a cluster matching and permutation program for dealing with label switching and multimodality in analysis of population structure. Bioinformatics, 23(14), 1801–1806. doi: <a href='https://doi.org/10.1093/bioinformatics/btm233'>10.1093/bioinformatics/btm233</a></li>",
+            "<li>Kopelman, N. M., Mayzel, J., Jakobsson, M., Rosenberg, N. A., & Mayrose, I. (2015). Clumpak: a program for identifying clustering modes and packaging population structure inferences across K. Molecular Ecology Resources, 15(5), 1179–1191. doi: <a href='https://doi.org/10.1111/1755-0998.12387'>10.1111/1755-0998.12387</a></li>",
+            "<li>Li, H. (2011). Tabix: fast retrieval of sequence features from generic TAB-delimited files. Bioinformatics, 27(5), 718–719. doi: <a href='https://doi.org/10.1093/bioinformatics/btq671'>10.1093/bioinformatics/btq671</a></li>",
+            "<li>Martin, B. T., Chafin, T. K., Douglas, M. R., & Douglas, M. E. SNPio: a Python API for population genomic file processing, filtering, and analysis. <a href='https://github.com/btmartin721/SNPio'>https://github.com/btmartin721/SNPio</a></li>",
+            "<li>Mussmann, S. M., Douglas, M. R., Chafin, T. K., & Douglas, M. E. (2020). AdmixPipe: population analyses in ADMIXTURE for non-model organisms. BMC Bioinformatics, 21, 337. doi: <a href='https://doi.org/10.1186/s12859-020-03701-4'>10.1186/s12859-020-03701-4</a></li>",
+            "<li>Mussmann, S. M., Douglas, M. R., Chafin, T. K., & Douglas, M. E. (2023). AdmixPipe v3: facilitating population structure delimitation from SNP data. Bioinformatics Advances, 3(1), vbad115. doi: <a href='https://doi.org/10.1093/bioadv/vbad115'>10.1093/bioadv/vbad115</a></li>",
+            "<li>Rosenberg, N. A. (2004). DISTRUCT: a program for the graphical display of population structure. Molecular Ecology Notes, 4(1), 137–138. doi: <a href='https://doi.org/10.1046/j.1471-8286.2003.00566.x'>10.1046/j.1471-8286.2003.00566.x</a></li>"
         ].join(' ').trim()
 
     return reference_text
@@ -383,12 +492,8 @@ def methodsDescriptionText(mqc_methods_yaml) {
     meta["nodoi_text"] = meta.manifest_map.doi ? "" : "<li>If available, make sure to update the text to include the Zenodo DOI of version of the pipeline used. </li>"
 
     // Tool references
-    meta["tool_citations"] = ""
-    meta["tool_bibliography"] = ""
-
-    // TODO nf-core: Only uncomment below if logic in toolCitationText/toolBibliographyText has been filled!
-    // meta["tool_citations"] = toolCitationText().replaceAll(", \\.", ".").replaceAll("\\. \\.", ".").replaceAll(", \\.", ".")
-    // meta["tool_bibliography"] = toolBibliographyText()
+    meta["tool_citations"] = toolCitationText()
+    meta["tool_bibliography"] = toolBibliographyText()
 
 
     def methods_text = mqc_methods_yaml.text

@@ -1,102 +1,185 @@
 # aCaMEL/admixpipe: Usage
 
-> _Documentation of pipeline parameters is generated automatically from the pipeline schema and can no longer be found in markdown files._
-
 ## Introduction
 
-<!-- TODO nf-core: Add documentation about anything specific to running your pipeline. For general topics, please point to (and add to) the main nf-core website. -->
+aCaMEL/admixpipe estimates population structure from a multi-sample VCF using ADMIXTURE. This page covers the input files, every pipeline parameter, how the best K is chosen, how to add map layers, and how to run and tune the pipeline. For a description of the results, see [output.md](output.md).
 
-## Samplesheet input
+## Inputs
 
-You will need to create a samplesheet with information about the samples you would like to analyse before running the pipeline. Use this parameter to specify its location. It has to be a comma-separated file with 3 columns, and a header row as shown in the examples below.
+### Genotypes (`--input`)
 
-```bash
---input '[path to samplesheet file]'
+One multi-sample VCF, uncompressed (`.vcf`) or bgzip-compressed (`.vcf.gz`). The pipeline creates the tabix index itself.
+
+- The VCF should contain biallelic SNPs. Multi-allelic sites and indels should be removed beforehand, e.g. with `bcftools view -m2 -M2 -v snps`.
+- Contig names and positions are used for physical thinning (`--thin_dist`). Data mapped to a pseudo-reference (e.g. concatenated RAD loci) works, provided each locus has its own contig or loci are separated by at least `--thin_dist` bp.
+- The file's base name (everything before `.vcf`) is used as the prefix for output files.
+
+BCF input is not currently supported. Convert it with `bcftools view -Oz -o out.vcf.gz in.bcf`.
+
+### Population map (`--popmap`)
+
+A tab-delimited text file with **no header** and two columns: sample ID, then population (or sampling site) ID.
+
+```text
+86NCCFE01	NCCFE
+86NCCFE02	NCCFE
+86NCCOT01	NCCOT
 ```
 
-### Multiple runs of the same sample
+- Sample IDs must match the VCF header exactly.
+- Every sample in the VCF should be listed in the popmap. With SNPio's `force_popmap` behaviour, samples missing from either file are dropped, so check the per-sample table in the report to confirm who was retained.
+- Population IDs are used to group and order individuals in barplots, for per-population missing-data filters and summaries, for F<sub>ST</sub>, and to join samples to coordinates in `--site_coords`.
 
-The `sample` identifiers have to be the same when you have re-sequenced the same sample more than once e.g. to increase sequencing depth. The pipeline will concatenate the raw reads before performing any downstream analysis. Below is an example for the same sample sequenced across 3 lanes:
+### Site coordinates (`--site_coords`, optional)
 
-```csv title="samplesheet.csv"
-sample,fastq_1,fastq_2
-CONTROL_REP1,AEG588A1_S1_L002_R1_001.fastq.gz,AEG588A1_S1_L002_R2_001.fastq.gz
-CONTROL_REP1,AEG588A1_S1_L003_R1_001.fastq.gz,AEG588A1_S1_L003_R2_001.fastq.gz
-CONTROL_REP1,AEG588A1_S1_L004_R1_001.fastq.gz,AEG588A1_S1_L004_R2_001.fastq.gz
+A tab-delimited text file with **no header** and three columns: population/site ID (matching the popmap), latitude, longitude, in decimal degrees (WGS84).
+
+```text
+NCCFE	38.37291666666618	-96.49375000000065
+NCCOT	38.38541666666615	-96.54791666666732
 ```
 
-### Full samplesheet
+The first column may instead hold **individual** IDs, one row per sample, to map samples collected at different points. The pipeline matches rows against population IDs and against sample IDs, and uses whichever matches more rows.
 
-The pipeline will auto-detect whether a sample is single- or paired-end using the information provided in the samplesheet. The samplesheet can have as many columns as you desire, however, there is a strict requirement for the first 3 columns to match those defined in the table below.
+When this file is supplied, the report adds interactive maps of mean ancestry per site (pie charts, sized by sample count), for the best K and for every K. Samples with no matching coordinates are left off the maps.
 
-A final samplesheet file consisting of both single- and paired-end data may look something like the one below. This is for 6 samples, where `TREATMENT_REP3` has been sequenced twice.
+### Map layers (`--geo_data_config`, `--geo_data_dir`, optional)
 
-```csv title="samplesheet.csv"
-sample,fastq_1,fastq_2
-CONTROL_REP1,AEG588A1_S1_L002_R1_001.fastq.gz,AEG588A1_S1_L002_R2_001.fastq.gz
-CONTROL_REP2,AEG588A2_S2_L002_R1_001.fastq.gz,AEG588A2_S2_L002_R2_001.fastq.gz
-CONTROL_REP3,AEG588A3_S3_L002_R1_001.fastq.gz,AEG588A3_S3_L002_R2_001.fastq.gz
-TREATMENT_REP1,AEG588A4_S4_L003_R1_001.fastq.gz,
-TREATMENT_REP2,AEG588A5_S5_L003_R1_001.fastq.gz,
-TREATMENT_REP3,AEG588A6_S6_L003_R1_001.fastq.gz,
-TREATMENT_REP3,AEG588A6_S6_L004_R1_001.fastq.gz,
+Extra vector layers, such as rivers, watersheds or range boundaries, can be drawn beneath the pie charts. Two parameters are needed:
+
+- `--geo_data_dir`: a directory holding the layer files. Use any format GeoPandas can read, e.g. GeoPackage, GeoJSON or a shapefile with its sidecar files.
+- `--geo_data_config`: a JSON list describing each layer.
+
+```json
+[
+  {
+    "path": "my_layers/streams.gpkg",
+    "z_order": 1,
+    "style": { "color": "#0066ff", "weight": 1, "opacity": 1.0 }
+  },
+  {
+    "path": "my_layers/range.geojson",
+    "z_order": 0,
+    "style": { "color": "#555555", "weight": 2, "fillOpacity": 0.1 }
+  }
+]
 ```
 
-| Column    | Description                                                                                                                                                                            |
-| --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `sample`  | Custom sample name. This entry will be identical for multiple sequencing libraries/runs from the same sample. Spaces in sample names are automatically converted to underscores (`_`). |
-| `fastq_1` | Full path to FastQ file for Illumina short reads 1. File has to be gzipped and have the extension ".fastq.gz" or ".fq.gz".                                                             |
-| `fastq_2` | Full path to FastQ file for Illumina short reads 2. File has to be gzipped and have the extension ".fastq.gz" or ".fq.gz".                                                             |
+- `path` is resolved relative to the **parent** of `--geo_data_dir`, so it starts with the directory's own name. With `--geo_data_dir /data/my_layers`, the first layer above is read from `/data/my_layers/streams.gpkg`.
+- `z_order` sets the drawing order (lower values are drawn first, underneath).
+- `style` is passed to Leaflet as a [path style](https://leafletjs.com/reference.html#path-option).
 
-An [example samplesheet](../assets/samplesheet.csv) has been provided with the pipeline.
+The bundled example is [`assets/test_geo_data.json`](../assets/test_geo_data.json) with [`assets/test_geo_data/`](../assets/test_geo_data/). Map layers require `--site_coords`.
+
+## Parameters
+
+Every parameter can also be listed with `nextflow run aCaMEL/admixpipe --help`. Every value used in a run, defaults included, is recorded in the _Workflow Summary_ section of the report and in `pipeline_info/params_<timestamp>.json`.
+
+### Input/output
+
+| Parameter           | Default   | Description                                                                 |
+| ------------------- | --------- | --------------------------------------------------------------------------- |
+| `--input`           | required  | Input VCF (`.vcf` or `.vcf.gz`).                                            |
+| `--popmap`          | required  | Population map (see above).                                                 |
+| `--outdir`          | `results` | Output directory. Use an absolute path on cloud storage.                    |
+| `--site_coords`     | none      | Site coordinates. Enables the map sections of the report.                   |
+| `--geo_data_config` | none      | JSON describing extra map layers. Requires `--geo_data_dir`.                |
+| `--geo_data_dir`    | none      | Directory containing the files referenced by `--geo_data_config`.           |
+| `--multiqc_title`   | none      | Title shown at the top of the report and used in its file name.             |
+| `--email`           | none      | Address to send a completion summary to.                                    |
+
+### Filtering
+
+Filters are applied by SNPio in this order: per-population SNP missingness (`--pop_cov`), monomorphic sites, physical thinning (`--thin_dist`), overall SNP missingness (`--snp_cov`), individual missingness (`--ind_cov`), and minor allele frequency (`--min_maf`). The _Summary of Filtering Steps_ Sankey diagram in the report shows how many loci each step removed.
+
+| Parameter     | Default | Description                                                                                     |
+| ------------- | ------- | ----------------------------------------------------------------------------------------------- |
+| `--ind_cov`   | `0.9`   | Maximum proportion of missing genotypes allowed per individual.                                 |
+| `--snp_cov`   | `0.9`   | Maximum proportion of missing genotypes allowed per SNP.                                        |
+| `--pop_cov`   | `0.9`   | Maximum proportion of missing genotypes allowed per SNP within any population.                  |
+| `--min_maf`   | `0.05`  | Minimum minor allele frequency.                                                                 |
+| `--thin_dist` | `100`   | SNPs within this many bp of another SNP are removed, to reduce linkage between retained SNPs.   |
+
+ADMIXTURE assumes unlinked loci, so keep thinning on for data with many SNPs per locus. For RADseq-style data, a `--thin_dist` longer than the read length keeps roughly one SNP per locus.
+
+### ADMIXTURE and choice of K
+
+| Parameter        | Default | Description                                                            |
+| ---------------- | ------- | ---------------------------------------------------------------------- |
+| `--maxk`         | `10`    | Largest K tested. ADMIXTURE is run for every K from 1 to `--maxk`.     |
+| `--num_reps`     | `10`    | Independent ADMIXTURE replicates per K (different random seeds).       |
+| `--num_cv`       | `10`    | Number of cross-validation folds.                                      |
+| `--bestk_method` | `cv`    | How the best K is chosen: `cv`, `evanno`, `lnl`, `l1` or `l2`.         |
+
+The total number of ADMIXTURE runs is `maxk × num_reps`, so runtime grows with both values.
+
+#### Choosing the best K
+
+All of the results below are reported whichever method you choose. The only effect of `--bestk_method` is which K is highlighted and used for the _Best K_ sections of the report. K = 1 is never selected.
+
+| Method   | Chooses the K that…                                                                                        |
+| -------- | ---------------------------------------------------------------------------------------------------------- |
+| `cv`     | has the lowest mean ADMIXTURE cross-validation error across replicates.                                    |
+| `evanno` | has the highest Evanno ΔK = mean(\|L″(K)\|) / sd(L(K)) (Evanno _et al._ 2005).                              |
+| `lnl`    | sits at the "elbow" of the mean log-likelihood curve L(K).                                                 |
+| `l1`     | sits at the elbow of the first-order rate of change L′(K).                                                 |
+| `l2`     | sits at the elbow of \|L″(K)\|.                                                                            |
+
+The elbow is the K furthest from the straight line joining the first and last points of the curve. Ties go to the smaller K.
+
+No single criterion is reliable in every case. ΔK, for example, cannot select K = 1 and tends to favour K = 2 under hierarchical structure. Treat the best K as a starting point. Look at the barplots for all K, the evalAdmix residuals, and the PCA before interpreting results.
+
+### Hidden and advanced options
+
+The standard nf-core options for resource limits (`--max_cpus`, `--max_memory`, `--max_time`), institutional configs, notifications and MultiQC customisation are also available. Show them with `--help --validationShowHiddenParams`.
+
+`--kriging` (interpolated ancestry surfaces) is present but not currently supported. Setting it stops the pipeline with an error.
 
 ## Running the pipeline
 
-The typical command for running the pipeline is as follows:
+A typical command:
 
 ```bash
-nextflow run aCaMEL/admixpipe --input ./samplesheet.csv --outdir ./results --genome GRCh37 -profile docker
+nextflow run aCaMEL/admixpipe \
+    -profile docker \
+    --input genotypes.vcf.gz \
+    --popmap popmap.tsv \
+    --outdir results
 ```
 
-This will launch the pipeline with the `docker` configuration profile. See below for more information about profiles.
-
-Note that the pipeline will create the following files in your working directory:
+The pipeline will create the following files in your working directory:
 
 ```bash
-work                # Directory containing the nextflow working files
-<OUTDIR>            # Finished results in specified location (defined with --outdir)
-.nextflow_log       # Log file from Nextflow
-# Other nextflow hidden files, eg. history of pipeline runs and old logs.
+work                # Directory containing the Nextflow working files
+<OUTDIR>            # Finished results in the specified location (defined with --outdir)
+.nextflow.log       # Log file from Nextflow
+# Other Nextflow hidden files, e.g. history of pipeline runs and old logs.
 ```
 
-If you wish to repeatedly use the same parameters for multiple runs, rather than specifying each flag in the command, you can specify these in a params file.
+### Parameter files
 
-Pipeline settings can be provided in a `yaml` or `json` file via `-params-file <file>`.
-
-:::warning
-Do not use `-c <file>` to specify parameters as this will result in errors. Custom config files specified with `-c` must only be used for [tuning process resource specifications](https://nf-co.re/docs/usage/configuration#tuning-workflow-resources), other infrastructural tweaks (such as output directories), or module arguments (args).
-:::
-
-The above pipeline run specified with a params file in yaml format:
+To reuse the same settings, put them in a YAML or JSON file and pass it with `-params-file`:
 
 ```bash
 nextflow run aCaMEL/admixpipe -profile docker -params-file params.yaml
 ```
 
-with `params.yaml` containing:
-
 ```yaml
-input: './samplesheet.csv'
-outdir: './results/'
-genome: 'GRCh37'
-<...>
+input: "genotypes.vcf.gz"
+popmap: "popmap.tsv"
+site_coords: "site_coords.tsv"
+outdir: "results"
+maxk: 12
+num_reps: 20
+bestk_method: "evanno"
 ```
 
-You can also generate such `YAML`/`JSON` files via [nf-core/launch](https://nf-co.re/launch).
+> [!WARNING]
+> Do not use `-c <file>` to set parameters. Custom config files given with `-c` should only be used for resource requests, infrastructure settings, or module arguments (`ext.args`, see below).
 
 ### Updating the pipeline
 
-When you run the above command, Nextflow automatically pulls the pipeline code from GitHub and stores it as a cached version. When running the pipeline after this, it will always use the cached version if available - even if the pipeline has been updated since. To make sure that you're running the latest version of the pipeline, make sure that you regularly update the cached version of the pipeline:
+Nextflow caches pipeline code on first run and keeps using the cached version. To get the latest version:
 
 ```bash
 nextflow pull aCaMEL/admixpipe
@@ -104,120 +187,96 @@ nextflow pull aCaMEL/admixpipe
 
 ### Reproducibility
 
-It is a good idea to specify a pipeline version when running the pipeline on your data. This ensures that a specific version of the pipeline code and software are used when you run your pipeline. If you keep using the same tag, you'll be running the same version of the pipeline, even if there have been changes to the code since.
-
-First, go to the [aCaMEL/admixpipe releases page](https://github.com/aCaMEL/admixpipe/releases) and find the latest pipeline version - numeric only (eg. `1.3.1`). Then specify this when running the pipeline with `-r` (one hyphen) - eg. `-r 1.3.1`. Of course, you can switch to another version by changing the number after the `-r` flag.
-
-This version number will be logged in reports when you run the pipeline, so that you'll know what you used when you look back in the future. For example, at the bottom of the MultiQC reports.
-
-To further assist in reproducbility, you can use share and re-use [parameter files](#running-the-pipeline) to repeat pipeline runs with the same settings without having to write out a command with every single parameter.
-
-:::tip
-If you wish to share such profile (such as upload as supplementary material for academic publications), make sure to NOT include cluster specific paths to files, nor institutional specific profiles.
-:::
+Specify a release with `-r` (e.g. `-r 1.0.0`) so that the same code and containers are used every time. The version, commit ID, full command line and every parameter value are recorded in the report's _Workflow Summary_ section. A draft methods paragraph with references is in its _Methods Description_ section. Keep `pipeline_info/params_<timestamp>.json` and any custom config files with your results.
 
 ## Core Nextflow arguments
 
-:::note
-These options are part of Nextflow and use a _single_ hyphen (pipeline parameters use a double-hyphen).
-:::
+> [!NOTE]
+> These options are part of Nextflow and use a _single_ hyphen (pipeline parameters use a double hyphen).
 
 ### `-profile`
 
-Use this parameter to choose a configuration profile. Profiles can give configuration presets for different compute environments.
+Selects configuration presets. Several can be combined, e.g. `-profile test,docker`. Later profiles override earlier ones.
 
-Several generic profiles are bundled with the pipeline which instruct the pipeline to use software packaged using different methods (Docker, Singularity, Podman, Shifter, Charliecloud, Apptainer, Conda) - see below.
+A container engine is required. Several steps use purpose-built containers for AdmixPipe, SNPio and plotting, so the `conda` and `mamba` profiles do **not** work with this pipeline.
 
-:::info
-We highly recommend the use of Docker or Singularity containers for full pipeline reproducibility, however when this is not possible, Conda is also supported.
-:::
+- `docker`: use [Docker](https://docker.com/).
+- `singularity` / `apptainer`: use [Singularity](https://sylabs.io/docs/) or [Apptainer](https://apptainer.org/). Recommended on HPC systems.
+- `podman`, `shifter`, `charliecloud`: use those engines.
+- `arm`: add this alongside `docker` on Apple Silicon or other ARM machines. It runs the x86-64 images under emulation, e.g. `-profile docker,arm`.
+- `test`: runs a small bundled dataset (with maps and a map layer) and needs no other parameters.
+- `test_full`: the same dataset with the default ADMIXTURE settings (K = 1–10, 10 replicates, 10-fold CV).
 
-The pipeline also dynamically loads configurations from [https://github.com/nf-core/configs](https://github.com/nf-core/configs) when it runs, making multiple config profiles for various institutional clusters available at run time. For more information and to see if your system is available in these configs please see the [nf-core/configs documentation](https://github.com/nf-core/configs#documentation).
-
-Note that multiple profiles can be loaded, for example: `-profile test,docker` - the order of arguments is important!
-They are loaded in sequence, so later profiles can overwrite earlier profiles.
-
-If `-profile` is not specified, the pipeline will run locally and expect all software to be installed and available on the `PATH`. This is _not_ recommended, since it can lead to different results on different machines dependent on the computer enviroment.
-
-- `test`
-  - A profile with a complete configuration for automated testing
-  - Includes links to test data so needs no other parameters
-- `docker`
-  - A generic configuration profile to be used with [Docker](https://docker.com/)
-- `singularity`
-  - A generic configuration profile to be used with [Singularity](https://sylabs.io/docs/)
-- `podman`
-  - A generic configuration profile to be used with [Podman](https://podman.io/)
-- `shifter`
-  - A generic configuration profile to be used with [Shifter](https://nersc.gitlab.io/development/shifter/how-to-use/)
-- `charliecloud`
-  - A generic configuration profile to be used with [Charliecloud](https://hpc.github.io/charliecloud/)
-- `apptainer`
-  - A generic configuration profile to be used with [Apptainer](https://apptainer.org/)
-- `wave`
-  - A generic configuration profile to enable [Wave](https://seqera.io/wave/) containers. Use together with one of the above (requires Nextflow ` 24.03.0-edge` or later).
-- `conda`
-  - A generic configuration profile to be used with [Conda](https://conda.io/docs/). Please only use Conda as a last resort i.e. when it's not possible to run the pipeline with Docker, Singularity, Podman, Shifter, Charliecloud, or Apptainer.
+The pipeline also loads institutional profiles from [nf-core/configs](https://github.com/nf-core/configs), so `-profile <your_institution>` may already work on your cluster.
 
 ### `-resume`
 
-Specify this when restarting a pipeline. Nextflow will use cached results from any pipeline steps where the inputs are the same, continuing from where it got to previously. For input to be considered the same, not only the names must be identical but the files' contents as well. For more info about this parameter, see [this blog post](https://www.nextflow.io/blog/2019/demystifying-nextflow-resume.html).
-
-You can also supply a run name to resume a specific run: `-resume [run-name]`. Use the `nextflow log` command to show previous run names.
+Restarts a run, reusing cached results for any step whose inputs have not changed. This is useful after adjusting a report-only setting, or after a failure late in the run. You can resume a specific run with `-resume <run-name>`. `nextflow log` lists previous run names.
 
 ### `-c`
 
-Specify the path to a specific config file (this is a core Nextflow command). See the [nf-core website documentation](https://nf-co.re/usage/configuration) for more information.
+Loads an extra config file, e.g. for resource requests or tool arguments (below).
 
 ## Custom configuration
 
 ### Resource requests
 
-Whilst the default requirements set within the pipeline will hopefully work for most people and with most input data, you may find that you want to customise the compute resources that the pipeline requests. Each step in the pipeline has a default set of requirements for number of CPUs, memory and time. For most of the steps in the pipeline, if the job exits with any of the error codes specified [here](https://github.com/nf-core/rnaseq/blob/4c27ef5610c87db00c3c5a3eed10b1d161abf575/conf/base.config#L18) it will automatically be resubmitted with higher requests (2 x original, then 3 x original). If it still fails after the third attempt then the pipeline execution is stopped.
+Each step has default CPU, memory and time requests (see [`conf/base.config`](../conf/base.config)). Steps that fail with a resource-related exit code are retried automatically with larger requests. The upper limits are set by `--max_cpus`, `--max_memory` and `--max_time`.
 
-To change the resource requests, please see the [max resources](https://nf-co.re/docs/usage/configuration#max-resources) and [tuning workflow resources](https://nf-co.re/docs/usage/configuration#tuning-workflow-resources) section of the nf-core website.
+The ADMIXTURE step does most of the work. It uses up to 12 CPUs and has a 48 h time limit, doubled on retry. To change these, add something like this to a config file and pass it with `-c`:
 
-### Custom Containers
+```groovy
+process {
+    withName: 'ADMIXTUREPIPELINE' {
+        cpus   = 24
+        memory = 32.GB
+        time   = 96.h
+    }
+}
+```
 
-In some cases you may wish to change which container or conda environment a step of the pipeline uses for a particular tool. By default nf-core pipelines use containers and software from the [biocontainers](https://biocontainers.pro/) or [bioconda](https://bioconda.github.io/) projects. However in some cases the pipeline specified version maybe out of date.
+### Tool arguments
 
-To use a different container from the default container or conda environment specified in a pipeline, please see the [updating tool versions](https://nf-co.re/docs/usage/configuration#updating-tool-versions) section of the nf-core website.
+Extra arguments can be passed to individual steps with `ext.args` in a config file. For example, to change the colour palette and basemap of the ancestry maps:
 
-### Custom Tool Arguments
+```groovy
+process {
+    withName: 'PLOT_ADMIXTURE_SPATIAL' {
+        ext.args = '--palette Set2 --basemap CartoDB.Positron'
+    }
+}
+```
 
-A pipeline might not always support every possible argument or option of a particular tool used in pipeline. Fortunately, nf-core pipelines provide some freedom to users to insert additional parameters that the pipeline does not include by default.
+Some steps already set `ext.args` in [`conf/modules.config`](../conf/modules.config). If you override one, include the existing arguments you want to keep.
 
-To learn how to provide additional arguments to a particular tool of the pipeline, please see the [customising tool arguments](https://nf-co.re/docs/usage/configuration#customising-tool-arguments) section of the nf-core website.
+Setting `ext.args` for `SNPIO_FILTER` to `--permutations 1000` gives permutation p-values for pairwise F<sub>ST</sub>. The default is 0, i.e. no permutations. This can add substantially to runtime.
 
-### nf-core/configs
+### Running on HPC
 
-In most cases, you will only need to create a custom config as a one-off but if you and others within your organisation are likely to be running nf-core pipelines regularly and need to use the same settings regularly it may be a good idea to request that your custom config file is uploaded to the `nf-core/configs` git repository. Before you do this please can you test that the config file works with your pipeline of choice using the `-c` parameter. You can then create a pull request to the `nf-core/configs` repository with the addition of your config file, associated documentation file (see examples in [`nf-core/configs/docs`](https://github.com/nf-core/configs/tree/master/docs)), and amending [`nfcore_custom.config`](https://github.com/nf-core/configs/blob/master/nfcore_custom.config) to include your custom profile.
+Use `-profile singularity` or `-profile apptainer`, plus an executor config for your scheduler, e.g.:
 
-See the main [Nextflow documentation](https://www.nextflow.io/docs/latest/config.html) for more information about creating your own configuration files.
+```groovy
+process.executor = 'slurm'
+process.queue    = 'comp'
+```
 
-If you have any questions or issues please send us a message on [Slack](https://nf-co.re/join/slack) on the [`#configs` channel](https://nfcore.slack.com/channels/configs).
+Or use your institution's profile from nf-core/configs if one exists.
 
-## Azure Resource Requests
+## Troubleshooting
 
-To be used with the `azurebatch` profile by specifying the `-profile azurebatch`.
-We recommend providing a compute `params.vm_type` of `Standard_D16_v3` VMs by default but these options can be changed if required.
-
-Note that the choice of VM size depends on your quota and the overall workload during the analysis.
-For a thorough list, please refer the [Azure Sizes for virtual machines in Azure](https://docs.microsoft.com/en-us/azure/virtual-machines/sizes).
+- **Samples missing from results**: check that the sample IDs in `--popmap` exactly match the VCF header (`bcftools query -l file.vcf.gz`). Also check the _Missing Data Per-sample_ section of the report, since samples above `--ind_cov` are removed.
+- **Very few SNPs after filtering**: check the _Summary of Filtering Steps_ Sankey diagram to see which filter removed most loci. Relax that filter, e.g. raise `--pop_cov` for populations with few samples, or lower `--thin_dist`.
+- **Maps are missing**: maps are only made when `--site_coords` is given, and only for populations present in that file.
+- **Maps have no background tiles**: basemap tiles load from the internet when the report is opened, so view it with a network connection.
+- **Apple Silicon**: add the `arm` profile, e.g. `-profile docker,arm`.
 
 ## Running in the background
 
-Nextflow handles job submissions and supervises the running jobs. The Nextflow process must run until the pipeline is finished.
-
-The Nextflow `-bg` flag launches Nextflow in the background, detached from your terminal so that the workflow does not stop if you log out of your session. The logs are saved to a file.
-
-Alternatively, you can use `screen` / `tmux` or similar tool to create a detached session which you can log back into at a later time.
-Some HPC setups also allow you to run nextflow within a cluster job submitted your job scheduler (from where it submits more jobs).
+Nextflow must keep running until the pipeline finishes. Use `nextflow run ... -bg` to detach it from the terminal, or run it inside `screen` or `tmux`. On HPC you can also submit Nextflow itself as a (long, low-resource) job.
 
 ## Nextflow memory requirements
 
-In some cases, the Nextflow Java virtual machines can start to request a large amount of memory.
-We recommend adding the following line to your environment to limit this (typically in `~/.bashrc` or `~./bash_profile`):
+To stop the Nextflow Java process itself from using too much memory, add this to your environment, e.g. in `~/.bashrc`:
 
 ```bash
 NXF_OPTS='-Xms1g -Xmx4g'

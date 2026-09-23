@@ -10,20 +10,55 @@
             "type": "object",
             "fa_icon": "fas fa-terminal",
             "description": "Define where the pipeline should find input data and save output data.",
-            "required": ["input", "outdir"],
+            "required": [
+                "input",
+                "popmap",
+                "outdir"
+            ],
             "properties": {
                 "input": {
                     "type": "string",
                     "format": "file-path",
                     "exists": true,
-                    "pattern": "^\\S+(\\.vcf(\\.gz)?|\\.bcf(\\.gz)?)$",
+                    "pattern": "^\\S+\\.vcf(\\.gz)?$",
                     "mimetype": [
                         "text/vcf",
                         "application/x-gzip"
                     ],
-                    "description": "Path to genotypes as .vcf, .bcf, .vcf.gz, or .bcf.gz",
-                    "help_text": "You will need to create a design file with information about the samples in your experiment before running the pipeline. Use this parameter to specify its location. It has to be a comma-separated file with 3 columns, and a header row.",
-                    "fa_icon": "fas fa-file-csv"
+                    "description": "Path to the input genotypes as a .vcf or .vcf.gz file.",
+                    "help_text": "A single multi-sample VCF containing biallelic SNPs for all individuals. Uncompressed VCFs are bgzipped and indexed automatically. Every sample in the VCF must be listed in `--popmap`.",
+                    "fa_icon": "fas fa-file"
+                },
+                "popmap": {
+                    "type": "string",
+                    "format": "file-path",
+                    "exists": true,
+                    "description": "Tab-delimited population map assigning each sample to a population or sampling site.",
+                    "help_text": "Two columns with no header: sample ID (matching the VCF header) and population/site ID. Population IDs are used to group individuals in plots and, when `--site_coords` is given, to place them on the map.",
+                    "fa_icon": "fas fa-users"
+                },
+                "site_coords": {
+                    "type": "string",
+                    "format": "file-path",
+                    "exists": true,
+                    "description": "Optional tab-delimited file of sampling-site coordinates. Enables the admixture map sections of the report.",
+                    "help_text": "Three columns with no header: population/site ID (matching `--popmap`), latitude, longitude, in decimal degrees (WGS84).",
+                    "fa_icon": "fas fa-map-marker-alt"
+                },
+                "geo_data_config": {
+                    "type": "string",
+                    "format": "file-path",
+                    "exists": true,
+                    "description": "Optional JSON file describing extra vector layers (e.g. rivers, range boundaries) to draw on the admixture maps.",
+                    "help_text": "A list of layer objects, each with a `path` (relative to the parent of `--geo_data_dir`), an optional `z_order` and a Leaflet `style` object. Requires `--site_coords` and `--geo_data_dir`. See `docs/usage.md` for an example.",
+                    "fa_icon": "fas fa-layer-group"
+                },
+                "geo_data_dir": {
+                    "type": "string",
+                    "format": "directory-path",
+                    "exists": true,
+                    "description": "Directory containing the vector layer files referenced by `--geo_data_config`.",
+                    "fa_icon": "fas fa-folder"
                 },
                 "outdir": {
                     "type": "string",
@@ -45,12 +80,101 @@
                 }
             }
         },
-        "reference_genome_options": {
-            "title": "Reference genome options",
+        "filtering_options": {
+            "title": "Filtering options",
             "type": "object",
-            "fa_icon": "fas fa-dna",
-            "description": "Reference genome related files and options required for the workflow.",
+            "fa_icon": "fas fa-filter",
+            "description": "SNPio filters applied to the input VCF before ADMIXTURE is run.",
             "properties": {
+                "ind_cov": {
+                    "type": "number",
+                    "default": 0.9,
+                    "minimum": 0,
+                    "maximum": 1,
+                    "description": "Maximum proportion of missing genotypes allowed per individual.",
+                    "fa_icon": "fas fa-user-minus"
+                },
+                "snp_cov": {
+                    "type": "number",
+                    "default": 0.9,
+                    "minimum": 0,
+                    "maximum": 1,
+                    "description": "Maximum proportion of missing genotypes allowed per SNP.",
+                    "fa_icon": "fas fa-percent"
+                },
+                "pop_cov": {
+                    "type": "number",
+                    "default": 0.9,
+                    "minimum": 0,
+                    "maximum": 1,
+                    "description": "Maximum proportion of missing genotypes allowed per SNP within any one population.",
+                    "fa_icon": "fas fa-percent"
+                },
+                "min_maf": {
+                    "type": "number",
+                    "default": 0.05,
+                    "minimum": 0,
+                    "maximum": 0.5,
+                    "description": "Minimum minor allele frequency for a SNP to be retained.",
+                    "fa_icon": "fas fa-chart-bar"
+                },
+                "thin_dist": {
+                    "type": "integer",
+                    "default": 100,
+                    "minimum": 0,
+                    "description": "Thinning distance in bp. SNPs closer than this to a neighbouring SNP are removed, to reduce linkage.",
+                    "fa_icon": "fas fa-ruler-horizontal"
+                }
+            }
+        },
+        "admixture_options": {
+            "title": "ADMIXTURE options",
+            "type": "object",
+            "fa_icon": "fas fa-project-diagram",
+            "description": "Options controlling the ADMIXTURE runs and the choice of best K.",
+            "properties": {
+                "maxk": {
+                    "type": "integer",
+                    "default": 10,
+                    "minimum": 2,
+                    "description": "Maximum number of ancestral populations (K) to test. K is tested from 1 to this value.",
+                    "fa_icon": "fas fa-sort-numeric-up"
+                },
+                "num_reps": {
+                    "type": "integer",
+                    "default": 10,
+                    "minimum": 1,
+                    "description": "Number of independent ADMIXTURE replicates per K.",
+                    "fa_icon": "fas fa-redo"
+                },
+                "num_cv": {
+                    "type": "integer",
+                    "default": 10,
+                    "minimum": 2,
+                    "description": "Number of cross-validation folds used by ADMIXTURE.",
+                    "fa_icon": "fas fa-random"
+                },
+                "bestk_method": {
+                    "type": "string",
+                    "default": "cv",
+                    "enum": [
+                        "cv",
+                        "lnl",
+                        "l1",
+                        "l2",
+                        "evanno"
+                    ],
+                    "description": "Method used to choose the best K shown in the report.",
+                    "help_text": "`cv`: lowest mean cross-validation error. `evanno`: highest Evanno delta K. `lnl`: elbow of the mean log-likelihood curve. `l1`: elbow of L'(K). `l2`: elbow of |L''(K)|. All methods ignore K = 1.",
+                    "fa_icon": "fas fa-check-circle"
+                },
+                "kriging": {
+                    "type": "boolean",
+                    "default": false,
+                    "hidden": true,
+                    "description": "Enable interpolated (kriged) ancestry surfaces. Not currently supported.",
+                    "fa_icon": "fas fa-globe"
+                }
             }
         },
         "institutional_config_options": {
@@ -161,7 +285,14 @@
                     "description": "Method used to save pipeline results to output directory.",
                     "help_text": "The Nextflow `publishDir` option specifies which intermediate files should be saved to the output directory. This option tells the pipeline what method should be used to move these files. See [Nextflow docs](https://www.nextflow.io/docs/latest/process.html#publishdir) for details.",
                     "fa_icon": "fas fa-copy",
-                    "enum": ["symlink", "rellink", "link", "copy", "copyNoFollow", "move"],
+                    "enum": [
+                        "symlink",
+                        "rellink",
+                        "link",
+                        "copy",
+                        "copyNoFollow",
+                        "move"
+                    ],
                     "hidden": true
                 },
                 "email_on_fail": {
@@ -260,7 +391,10 @@
             "$ref": "#/definitions/input_output_options"
         },
         {
-            "$ref": "#/definitions/reference_genome_options"
+            "$ref": "#/definitions/filtering_options"
+        },
+        {
+            "$ref": "#/definitions/admixture_options"
         },
         {
             "$ref": "#/definitions/institutional_config_options"

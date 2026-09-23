@@ -1,6 +1,6 @@
 process ADMIXTUREPIPELINE {
     tag "$meta.id"
-    label 'process_large'
+    label 'process_high'
 
     container 'docker.io/mussmann/admixpipe:3.2'
 
@@ -39,7 +39,7 @@ process ADMIXTUREPIPELINE {
         -C 1.0 \\
         -S 0.0 \\
         -c ${params.num_cv} \\
-        -R ${params.num_reps}
+        -R ${params.num_reps} \\
         ${args}
 
     cat <<-END_VERSIONS > versions.yml

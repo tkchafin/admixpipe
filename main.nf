@@ -80,8 +80,7 @@ workflow {
         params.popmap,
         params.site_coords,
         params.geo_data_config,
-        params.geo_data_dir,
-        params.reference
+        params.geo_data_dir
     )
 
     //

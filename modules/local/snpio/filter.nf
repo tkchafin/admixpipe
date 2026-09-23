@@ -24,7 +24,6 @@ process SNPIO_FILTER {
     snpio_filter.py \\
         --vcf ${vcf} \\
         --popmap ${popmap} \\
-        --ind_cov ${params.ind_cov} \\
         --min_maf ${params.min_maf} \\
         --snp_cov ${params.snp_cov} \\
         --ind_cov ${params.ind_cov} \\
