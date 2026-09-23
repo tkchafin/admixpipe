@@ -134,6 +134,8 @@ def main():
     # use first K to get counts
     df0    = load_data(str(files[Ks[0]]), args.inds, args.pops)
     sites0 = aggregate_sites(df0, coords, [c for c in df0 if c.startswith("Cluster")])
+    print(df0)
+    print(coords)
     min_n, max_n = int(sites0["count"].min()), int(sites0["count"].max())
     # legend HTML
     size_html = ""
