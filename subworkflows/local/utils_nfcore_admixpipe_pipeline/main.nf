@@ -243,14 +243,12 @@ def validateInputParameters() {
         try {
             params.maxk = params.maxk as Integer
         } catch (Exception e) {
-            log.error "Invalid value for --maxk: '${params.maxk}'. It must be an integer."
-            System.exit(1)
+            error("Invalid value for --maxk: '${params.maxk}'. It must be an integer.")
         }
     }
 
     if (params.maxk <= 1) {
-        log.error "Invalid value for --maxk: '${params.maxk}'. It must be > 1."
-        System.exit(1)
+        error("Invalid value for --maxk: '${params.maxk}'. It must be > 1.")
     }
 
     // -------------------------
@@ -261,14 +259,12 @@ def validateInputParameters() {
             try {
                 params[p] = params[p] as Double
             } catch (Exception e) {
-                log.error "Invalid value for --${p}: '${params[p]}'. It must be numeric."
-                System.exit(1)
+                error("Invalid value for --${p}: '${params[p]}'. It must be numeric.")
             }
         }
 
         if (params[p] < 0 || params[p] > 1) {
-            log.error "Invalid value for --${p}: '${params[p]}'. Must be between 0 and 1."
-            System.exit(1)
+            error("Invalid value for --${p}: '${params[p]}'. Must be between 0 and 1.")
         }
     }
 
@@ -279,8 +275,7 @@ def validateInputParameters() {
         try {
             params.thin_dist = params.thin_dist as Integer
         } catch (Exception e) {
-            log.error "Invalid value for --thin_dist: '${params.thin_dist}'. It must be an integer."
-            System.exit(1)
+            error("Invalid value for --thin_dist: '${params.thin_dist}'. It must be an integer.")
         }
     }
 
@@ -291,8 +286,7 @@ def validateInputParameters() {
         try {
             params.num_cv = params.num_cv as Integer
         } catch (Exception e) {
-            log.error "Invalid value for --num_cv: '${params.num_cv}'. It must be an integer."
-            System.exit(1)
+            error("Invalid value for --num_cv: '${params.num_cv}'. It must be an integer.")
         }
     }
 
@@ -303,8 +297,7 @@ def validateInputParameters() {
         try {
             params.num_reps = params.num_reps as Integer
         } catch (Exception e) {
-            log.error "Invalid value for --num_reps: '${params.num_reps}'. It must be an integer."
-            System.exit(1)
+            error("Invalid value for --num_reps: '${params.num_reps}'. It must be an integer.")
         }
     }
 
@@ -312,16 +305,14 @@ def validateInputParameters() {
     // kriging (not supported yet)
     // -------------------------
     if (params.kriging) {
-        log.error "The --kriging option is not currently supported. Please set --kriging false."
-        System.exit(1)
+        error("The --kriging option is not currently supported. Please set --kriging false.")
     }
 
     // -------------------------
     // geodata layers
     // -------------------------
     if (params.geo_data_config && !params.geo_data_dir) {
-        log.error "--geo_data_config requires --geo_data_dir (the directory holding the layer files)."
-        System.exit(1)
+        error("--geo_data_config requires --geo_data_dir (the directory holding the layer files).")
     }
 
     if (params.geo_data_config && !params.site_coords) {
@@ -334,15 +325,13 @@ def validateInputParameters() {
     def allowedBestK = ["cv","lnl","l1","l2","evanno"]
 
     if (params.bestk_method == null) {
-        log.error "Parameter --bestk_method cannot be null."
-        System.exit(1)
+        error("Parameter --bestk_method cannot be null.")
     }
 
     params.bestk_method = params.bestk_method.toString().toLowerCase()
 
     if (!allowedBestK.contains(params.bestk_method)) {
-        log.error "Invalid value for --bestk_method: '${params.bestk_method}'. Allowed values: ${allowedBestK.join(', ')}"
-        System.exit(1)
+        error("Invalid value for --bestk_method: '${params.bestk_method}'. Allowed values: ${allowedBestK.join(', ')}")
     }
 }
 
@@ -442,7 +431,7 @@ def fullParamsSummaryMultiqc(schema_filename) {
 def toolCitationText() {
     def citation_text = [
             "Input genotypes were compressed and indexed with tabix (Li 2011), and sample lists were extracted with bcftools (Danecek et al. 2021).",
-            "SNPs and individuals were filtered, and missingness, F<sub>ST</sub> and PCA summaries were computed, with SNPio (Martin et al.).",
+            "SNPs and individuals were filtered, and missingness, F<sub>ST</sub> and PCA summaries were computed, with SNPio (Martin et al. 2026).",
             "Ancestry proportions were estimated with ADMIXTURE (Alexander et al. 2009) via AdmixPipe (Mussmann et al. 2020, 2023), using VCFtools (Danecek et al. 2011) and PLINK (Chang et al. 2015) for file conversion.",
             "Replicate runs were aligned with CLUMPAK (Kopelman et al. 2015) and CLUMPP (Jakobsson & Rosenberg 2007), and plotted with distruct (Rosenberg 2004).",
             "Model fit was assessed with evalAdmix (Garcia-Erill & Albrechtsen 2020), and the best K was chosen using ${params.bestk_method == 'evanno' ? 'the Evanno delta K method (Evanno et al. 2005)' : params.bestk_method == 'cv' ? 'ADMIXTURE cross-validation error' : 'the ' + params.bestk_method + ' criterion (Evanno et al. 2005)'}.",
@@ -464,10 +453,10 @@ def toolBibliographyText() {
             "<li>Jakobsson, M., & Rosenberg, N. A. (2007). CLUMPP: a cluster matching and permutation program for dealing with label switching and multimodality in analysis of population structure. Bioinformatics, 23(14), 1801–1806. doi: <a href='https://doi.org/10.1093/bioinformatics/btm233'>10.1093/bioinformatics/btm233</a></li>",
             "<li>Kopelman, N. M., Mayzel, J., Jakobsson, M., Rosenberg, N. A., & Mayrose, I. (2015). Clumpak: a program for identifying clustering modes and packaging population structure inferences across K. Molecular Ecology Resources, 15(5), 1179–1191. doi: <a href='https://doi.org/10.1111/1755-0998.12387'>10.1111/1755-0998.12387</a></li>",
             "<li>Li, H. (2011). Tabix: fast retrieval of sequence features from generic TAB-delimited files. Bioinformatics, 27(5), 718–719. doi: <a href='https://doi.org/10.1093/bioinformatics/btq671'>10.1093/bioinformatics/btq671</a></li>",
-            "<li>Martin, B. T., Chafin, T. K., Douglas, M. R., & Douglas, M. E. SNPio: a Python API for population genomic file processing, filtering, and analysis. <a href='https://github.com/btmartin721/SNPio'>https://github.com/btmartin721/SNPio</a></li>",
-            "<li>Mussmann, S. M., Douglas, M. R., Chafin, T. K., & Douglas, M. E. (2020). AdmixPipe: population analyses in ADMIXTURE for non-model organisms. BMC Bioinformatics, 21, 337. doi: <a href='https://doi.org/10.1186/s12859-020-03701-4'>10.1186/s12859-020-03701-4</a></li>",
-            "<li>Mussmann, S. M., Douglas, M. R., Chafin, T. K., & Douglas, M. E. (2023). AdmixPipe v3: facilitating population structure delimitation from SNP data. Bioinformatics Advances, 3(1), vbad115. doi: <a href='https://doi.org/10.1093/bioadv/vbad115'>10.1093/bioadv/vbad115</a></li>",
-            "<li>Rosenberg, N. A. (2004). DISTRUCT: a program for the graphical display of population structure. Molecular Ecology Notes, 4(1), 137–138. doi: <a href='https://doi.org/10.1046/j.1471-8286.2003.00566.x'>10.1046/j.1471-8286.2003.00566.x</a></li>"
+            "<li>Martin, B. T., Monaco, D. R., Sharabi, N., Mussmann, S. M., & Chafin, T. K. (2026). SNPio: a Python interface for population genomic data processing. BMC Bioinformatics. doi: <a href='https://doi.org/10.1186/s12859-026-06546-5'>10.1186/s12859-026-06546-5</a></li>",
+            "<li>Mussmann, S. M., Douglas, M. R., Chafin, T. K., & Douglas, M. E. (2020). AdmixPipe: population analyses in Admixture for non-model organisms. BMC Bioinformatics, 21, 337. doi: <a href='https://doi.org/10.1186/s12859-020-03701-4'>10.1186/s12859-020-03701-4</a></li>",
+            "<li>Mussmann, S. M., Douglas, M. R., Chafin, T. K., & Douglas, M. E. (2023). AdmixPipe v3: facilitating population structure delimitation from SNP data. Bioinformatics Advances, 3(1), vbad168. doi: <a href='https://doi.org/10.1093/bioadv/vbad168'>10.1093/bioadv/vbad168</a></li>",
+            "<li>Rosenberg, N. A. (2004). distruct: a program for the graphical display of population structure. Molecular Ecology Notes, 4(1), 137–138. doi: <a href='https://doi.org/10.1046/j.1471-8286.2003.00566.x'>10.1046/j.1471-8286.2003.00566.x</a></li>"
         ].join(' ').trim()
 
     return reference_text

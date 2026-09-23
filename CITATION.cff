@@ -1,0 +1,20 @@
+cff-version: 1.2.0
+message: If you use this software, please cite it using the metadata from this file
+  and all references from CITATIONS.md .
+title: aCaMEL/admixpipe
+type: software
+authors:
+  - family-names: Chafin
+    given-names: Tyler K.
+    orcid: https://orcid.org/0000-0001-8687-5905
+    website: https://github.com/tkchafin
+license: MIT
+repository-code: https://github.com/aCaMEL/admixpipe
+url: https://github.com/aCaMEL/admixpipe
+version: 1.0dev
+keywords:
+  - nextflow
+  - population genetics
+  - population structure
+  - ADMIXTURE
+  - SNP

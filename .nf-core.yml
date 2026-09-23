@@ -1,6 +1,7 @@
 lint:
   files_exist:
   - CODE_OF_CONDUCT.md
+  - conf/igenomes.config
   - assets/nf-core-admixpipe_logo_light.png
   - docs/images/nf-core-admixpipe_logo_light.png
   - docs/images/nf-core-admixpipe_logo_dark.png

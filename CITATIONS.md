@@ -1,5 +1,9 @@
 # aCaMEL/admixpipe: Citations
 
+## [aCaMEL/admixpipe](https://github.com/aCaMEL/admixpipe)
+
+> Chafin TK. aCaMEL/admixpipe. doi: 10.5281/zenodo.XXXXXXX
+
 ## [nf-core](https://pubmed.ncbi.nlm.nih.gov/32055031/)
 
 > Ewels PA, Peltzer A, Fillinger S, Patel H, Alneberg J, Wilm A, Garcia MU, Di Tommaso P, Nahnsen S. The nf-core framework for community-curated bioinformatics pipelines. Nat Biotechnol. 2020 Mar;38(3):276-278. doi: 10.1038/s41587-020-0439-x. PubMed PMID: 32055031.
@@ -16,9 +20,9 @@
 
 - [AdmixPipe](https://github.com/stevemussmann/admixturePipeline)
 
-  > Mussmann SM, Douglas MR, Chafin TK, Douglas ME. AdmixPipe: population analyses in ADMIXTURE for non-model organisms. BMC Bioinformatics. 2020;21:337. doi: 10.1186/s12859-020-03701-4.
+  > Mussmann SM, Douglas MR, Chafin TK, Douglas ME. AdmixPipe: population analyses in Admixture for non-model organisms. BMC Bioinformatics. 2020;21:337. doi: 10.1186/s12859-020-03701-4.
 
-  > Mussmann SM, Douglas MR, Chafin TK, Douglas ME. AdmixPipe v3: facilitating population structure delimitation from SNP data. Bioinformatics Advances. 2023;3(1):vbad115. doi: 10.1093/bioadv/vbad115.
+  > Mussmann SM, Douglas MR, Chafin TK, Douglas ME. AdmixPipe v3: facilitating population structure delimitation from SNP data. Bioinformatics Advances. 2023;3(1):vbad168. doi: 10.1093/bioadv/vbad168.
 
 - [BCFtools](https://doi.org/10.1093/gigascience/giab008)
 
@@ -34,7 +38,7 @@
 
 - [distruct](https://doi.org/10.1046/j.1471-8286.2003.00566.x)
 
-  > Rosenberg NA. DISTRUCT: a program for the graphical display of population structure. Mol Ecol Notes. 2004;4(1):137-138. doi: 10.1046/j.1471-8286.2003.00566.x.
+  > Rosenberg NA. distruct: a program for the graphical display of population structure. Mol Ecol Notes. 2004;4(1):137-138. doi: 10.1046/j.1471-8286.2003.00566.x.
 
 - [evalAdmix](https://doi.org/10.1111/1755-0998.13171)
 
@@ -54,7 +58,7 @@
 
 - [SNPio](https://github.com/btmartin721/SNPio)
 
-  > Martin BT, Chafin TK, Douglas MR, Douglas ME. SNPio: a Python API for population genomic file processing, filtering, and analysis. https://github.com/btmartin721/SNPio
+  > Martin BT, Monaco DR, Sharabi N, Mussmann SM, Chafin TK. SNPio: a Python interface for population genomic data processing. BMC Bioinformatics. 2026. doi: 10.1186/s12859-026-06546-5.
 
 - [Tabix](https://doi.org/10.1093/bioinformatics/btq671)
 
@@ -70,10 +74,6 @@
 
 ## Software packaging/containerisation tools
 
-- [Anaconda](https://anaconda.com)
-
-  > Anaconda Software Distribution. Computer software. Vers. 2-2.4.0. Anaconda, Nov. 2016. Web.
-
 - [Bioconda](https://pubmed.ncbi.nlm.nih.gov/29967506/)
 
   > Grüning B, Dale R, Sjödin A, Chapman BA, Rowe J, Tomkins-Tinch CH, Valieris R, Köster J; Bioconda Team. Bioconda: sustainable and comprehensive software distribution for the life sciences. Nat Methods. 2018 Jul;15(7):475-476. doi: 10.1038/s41592-018-0046-7. PubMed PMID: 29967506.
@@ -84,7 +84,7 @@
 
 - [Docker](https://dl.acm.org/doi/10.5555/2600239.2600241)
 
-  > Merkel, D. (2014). Docker: lightweight linux containers for consistent development and deployment. Linux Journal, 2014(239), 2. doi: 10.5555/2600239.2600241.
+  > Merkel, D. (2014). Docker: lightweight linux containers for consistent development and deployment. Linux Journal, 2014(239), 2.
 
 - [Singularity](https://pubmed.ncbi.nlm.nih.gov/28494014/)
 

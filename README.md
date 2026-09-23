@@ -56,7 +56,11 @@ nextflow run aCaMEL/admixpipe \
 > [!WARNING]
 > Please provide pipeline parameters via the CLI or Nextflow `-params-file` option. Custom config files including those provided by the `-c` Nextflow option can be used to provide any configuration _**except for parameters**_; see [docs](https://nf-co.re/docs/usage/getting_started/configuration#custom-configuration-files).
 
-For more details, please refer to the [usage documentation](docs/usage.md) and the [output documentation](docs/output.md).
+For more details and further functionality, please refer to the [usage documentation](docs/usage.md) and the [parameter documentation](nextflow_schema.json) (or run with `--help`).
+
+## Pipeline output
+
+The main output is an interactive report, `<OUTDIR>/report/multiqc_report.html`. For more details about the output files and reports, please refer to the [output documentation](docs/output.md).
 
 ## Credits
 
@@ -78,10 +82,10 @@ If you use aCaMEL/admixpipe for your analysis, please cite it using the followin
 Please also cite the tools used by the pipeline:
 
 - **ADMIXTURE**: Alexander DH, Novembre J, Lange K (2009). Fast model-based estimation of ancestry in unrelated individuals. _Genome Research_ 19:1655–1664. doi: [10.1101/gr.094052.109](https://doi.org/10.1101/gr.094052.109)
-- **AdmixPipe**: Mussmann SM, Douglas MR, Chafin TK, Douglas ME (2020). AdmixPipe: population analyses in ADMIXTURE for non-model organisms. _BMC Bioinformatics_ 21:337. doi: [10.1186/s12859-020-03701-4](https://doi.org/10.1186/s12859-020-03701-4)
+- **AdmixPipe**: Mussmann SM, Douglas MR, Chafin TK, Douglas ME (2020). AdmixPipe: population analyses in Admixture for non-model organisms. _BMC Bioinformatics_ 21:337. doi: [10.1186/s12859-020-03701-4](https://doi.org/10.1186/s12859-020-03701-4)
 - **CLUMPAK**: Kopelman NM, Mayzel J, Jakobsson M, Rosenberg NA, Mayrose I (2015). Clumpak: a program for identifying clustering modes and packaging population structure inferences across K. _Molecular Ecology Resources_ 15:1179–1191. doi: [10.1111/1755-0998.12387](https://doi.org/10.1111/1755-0998.12387)
 - **evalAdmix**: Garcia-Erill G, Albrechtsen A (2020). Evaluation of model fit of inferred admixture proportions. _Molecular Ecology Resources_ 20:936–949. doi: [10.1111/1755-0998.13171](https://doi.org/10.1111/1755-0998.13171)
-- **SNPio**: Martin BT, Chafin TK, Douglas MR, Douglas ME. SNPio: a Python API for population genomic file processing, filtering, and analysis. <https://github.com/btmartin721/SNPio>
+- **SNPio**: Martin BT, Monaco DR, Sharabi N, Mussmann SM, Chafin TK (2026). SNPio: a Python interface for population genomic data processing. _BMC Bioinformatics_. doi: [10.1186/s12859-026-06546-5](https://doi.org/10.1186/s12859-026-06546-5)
 
 An extensive list of references for the tools used by the pipeline can be found in the [`CITATIONS.md`](CITATIONS.md) file. Each report also includes a methods paragraph and reference list for the tools used in that run.
 
