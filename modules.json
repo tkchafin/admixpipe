@@ -1,6 +1,6 @@
 {
     "name": "aCaMEL/admixpipe",
-    "homePage": "https://github.com/aCaMEL/admixpipe",
+    "homePage": "https://github.com/UARK-aCaMEL/admixpipe",
     "repos": {
         "https://github.com/nf-core/modules.git": {
             "modules": {

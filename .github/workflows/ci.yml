@@ -19,7 +19,7 @@ jobs:
   test:
     name: Run pipeline with test data
     # Only run on push if this is the nf-core dev branch (merged PRs)
-    if: "${{ github.event_name != 'push' || (github.event_name == 'push' && github.repository == 'aCaMEL/admixpipe') }}"
+    if: "${{ github.event_name != 'push' || (github.event_name == 'push' && github.repository == 'UARK-aCaMEL/admixpipe') }}"
     runs-on: ubuntu-latest
     strategy:
       matrix:

@@ -28,4 +28,4 @@ Pipeline Configuration:
 
 --
 aCaMEL/admixpipe
-https://github.com/aCaMEL/admixpipe
+https://github.com/UARK-aCaMEL/admixpipe

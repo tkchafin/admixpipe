@@ -1,6 +1,6 @@
 # aCaMEL/admixpipe: Usage
 
-> _Documentation of pipeline parameters is generated automatically from the pipeline schema and can no longer be found in markdown files. Run `nextflow run aCaMEL/admixpipe --help` to list them._
+> _Documentation of pipeline parameters is generated automatically from the pipeline schema and can no longer be found in markdown files. Run `nextflow run UARK-aCaMEL/admixpipe --help` to list them._
 
 ## Introduction
 
@@ -84,7 +84,7 @@ K = 1 is never selected. No single method is reliable in every case, so check th
 The typical command for running the pipeline is as follows:
 
 ```bash
-nextflow run aCaMEL/admixpipe --input genotypes.vcf.gz --popmap popmap.tsv --outdir <OUTDIR> -profile docker
+nextflow run UARK-aCaMEL/admixpipe --input genotypes.vcf.gz --popmap popmap.tsv --outdir <OUTDIR> -profile docker
 ```
 
 This will launch the pipeline with the `docker` configuration profile. See below for more information about profiles.
@@ -108,7 +108,7 @@ Pipeline settings can be provided in a `yaml` or `json` file via `-params-file <
 The above pipeline run specified with a params file in yaml format:
 
 ```bash
-nextflow run aCaMEL/admixpipe -profile docker -params-file params.yaml
+nextflow run UARK-aCaMEL/admixpipe -profile docker -params-file params.yaml
 ```
 
 with `params.yaml` containing:
@@ -125,14 +125,14 @@ outdir: './results/'
 When you run the above command, Nextflow automatically pulls the pipeline code from GitHub and stores it as a cached version. When running the pipeline after this, it will always use the cached version if available - even if the pipeline has been updated since. To make sure that you're running the latest version of the pipeline, make sure that you regularly update the cached version of the pipeline:
 
 ```bash
-nextflow pull aCaMEL/admixpipe
+nextflow pull UARK-aCaMEL/admixpipe
 ```
 
 ### Reproducibility
 
 It is a good idea to specify a pipeline version when running the pipeline on your data. This ensures that a specific version of the pipeline code and software are used when you run your pipeline. If you keep using the same tag, you'll be running the same version of the pipeline, even if there have been changes to the code since.
 
-First, go to the [aCaMEL/admixpipe releases page](https://github.com/aCaMEL/admixpipe/releases) and find the latest pipeline version - numeric only (eg. `1.0.0`). Then specify this when running the pipeline with `-r` (one hyphen) - eg. `-r 1.0.0`.
+First, go to the [aCaMEL/admixpipe releases page](https://github.com/UARK-aCaMEL/admixpipe/releases) and find the latest pipeline version - numeric only (eg. `1.0.0`). Then specify this when running the pipeline with `-r` (one hyphen) - eg. `-r 1.0.0`.
 
 The version number, the full command line and the value of every parameter are recorded in the _Workflow Summary_ section of the MultiQC report. The parameters are also saved to `pipeline_info/params_<timestamp>.json`, which can be passed back with `-params-file` to repeat a run.
 

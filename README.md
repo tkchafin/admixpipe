@@ -5,14 +5,14 @@
   </picture>
 </h1>
 
-[![GitHub Actions CI Status](https://github.com/aCaMEL/admixpipe/actions/workflows/ci.yml/badge.svg)](https://github.com/aCaMEL/admixpipe/actions/workflows/ci.yml)
-[![GitHub Actions Linting Status](https://github.com/aCaMEL/admixpipe/actions/workflows/linting.yml/badge.svg)](https://github.com/aCaMEL/admixpipe/actions/workflows/linting.yml)
+[![GitHub Actions CI Status](https://github.com/UARK-aCaMEL/admixpipe/actions/workflows/ci.yml/badge.svg)](https://github.com/UARK-aCaMEL/admixpipe/actions/workflows/ci.yml)
+[![GitHub Actions Linting Status](https://github.com/UARK-aCaMEL/admixpipe/actions/workflows/linting.yml/badge.svg)](https://github.com/UARK-aCaMEL/admixpipe/actions/workflows/linting.yml)
 [![Cite with Zenodo](http://img.shields.io/badge/DOI-10.5281/zenodo.XXXXXXX-1073c8?labelColor=000000)](https://doi.org/10.5281/zenodo.XXXXXXX)
 
 [![Nextflow](https://img.shields.io/badge/nextflow%20DSL2-%E2%89%A523.04.0-23aa62.svg)](https://www.nextflow.io/)
 [![run with docker](https://img.shields.io/badge/run%20with-docker-0db7ed?labelColor=000000&logo=docker)](https://www.docker.com/)
 [![run with singularity](https://img.shields.io/badge/run%20with-singularity-1d355c.svg?labelColor=000000)](https://sylabs.io/docs/)
-[![Launch on Seqera Platform](https://img.shields.io/badge/Launch%20%F0%9F%9A%80-Seqera%20Platform-%234256e7)](https://cloud.seqera.io/launch?pipeline=https://github.com/aCaMEL/admixpipe)
+[![Launch on Seqera Platform](https://img.shields.io/badge/Launch%20%F0%9F%9A%80-Seqera%20Platform-%234256e7)](https://cloud.seqera.io/launch?pipeline=https://github.com/UARK-aCaMEL/admixpipe)
 
 ## Introduction
 
@@ -46,7 +46,7 @@ First, prepare a population map: a tab-delimited file with no header, giving eac
 Now, you can run the pipeline using:
 
 ```bash
-nextflow run aCaMEL/admixpipe \
+nextflow run UARK-aCaMEL/admixpipe \
    -profile <docker/singularity/.../institute> \
    --input genotypes.vcf.gz \
    --popmap popmap.tsv \
@@ -73,7 +73,7 @@ We thank the following people for their assistance in the development of this pi
 
 ## Contributions and Support
 
-If you would like to contribute to this pipeline, please see the [contributing guidelines](.github/CONTRIBUTING.md). Bugs and questions can be reported on the [issue tracker](https://github.com/aCaMEL/admixpipe/issues).
+If you would like to contribute to this pipeline, please see the [contributing guidelines](.github/CONTRIBUTING.md). Bugs and questions can be reported on the [issue tracker](https://github.com/UARK-aCaMEL/admixpipe/issues).
 
 ## Citations
 
@@ -84,6 +84,7 @@ Please also cite the tools used by the pipeline:
 - **ADMIXTURE**: Alexander DH, Novembre J, Lange K (2009). Fast model-based estimation of ancestry in unrelated individuals. _Genome Research_ 19:1655–1664. doi: [10.1101/gr.094052.109](https://doi.org/10.1101/gr.094052.109)
 - **AdmixPipe**: Mussmann SM, Douglas MR, Chafin TK, Douglas ME (2020). AdmixPipe: population analyses in Admixture for non-model organisms. _BMC Bioinformatics_ 21:337. doi: [10.1186/s12859-020-03701-4](https://doi.org/10.1186/s12859-020-03701-4)
 - **CLUMPAK**: Kopelman NM, Mayzel J, Jakobsson M, Rosenberg NA, Mayrose I (2015). Clumpak: a program for identifying clustering modes and packaging population structure inferences across K. _Molecular Ecology Resources_ 15:1179–1191. doi: [10.1111/1755-0998.12387](https://doi.org/10.1111/1755-0998.12387)
+- **distruct**: Rosenberg NA (2004). distruct: a program for the graphical display of population structure. _Molecular Ecology Notes_ 4:137–138. doi: [10.1046/j.1471-8286.2003.00566.x](https://doi.org/10.1046/j.1471-8286.2003.00566.x)
 - **evalAdmix**: Garcia-Erill G, Albrechtsen A (2020). Evaluation of model fit of inferred admixture proportions. _Molecular Ecology Resources_ 20:936–949. doi: [10.1111/1755-0998.13171](https://doi.org/10.1111/1755-0998.13171)
 - **SNPio**: Martin BT, Monaco DR, Sharabi N, Mussmann SM, Chafin TK (2026). SNPio: a Python interface for population genomic data processing. _BMC Bioinformatics_. doi: [10.1186/s12859-026-06546-5](https://doi.org/10.1186/s12859-026-06546-5)
 

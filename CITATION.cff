@@ -7,10 +7,23 @@ authors:
   - family-names: Chafin
     given-names: Tyler K.
     orcid: https://orcid.org/0000-0001-8687-5905
+    affiliation: University of Arkansas, Fayetteville
     website: https://github.com/tkchafin
+  - family-names: Mussmann
+    given-names: Steven M.
+    orcid: https://orcid.org/0000-0002-5237-5088
+    affiliation: Abernathy Fish Technology Center, U.S. Fish and Wildlife Service
+  - family-names: Douglas
+    given-names: Marlis R.
+    orcid: https://orcid.org/0000-0001-6234-3939
+    affiliation: University of Arkansas, Fayetteville
+  - family-names: Douglas
+    given-names: Michael E.
+    orcid: https://orcid.org/0000-0001-9670-7825
+    affiliation: University of Arkansas, Fayetteville
 license: MIT
-repository-code: https://github.com/aCaMEL/admixpipe
-url: https://github.com/aCaMEL/admixpipe
+repository-code: https://github.com/UARK-aCaMEL/admixpipe
+url: https://github.com/UARK-aCaMEL/admixpipe
 version: 1.0dev
 keywords:
   - nextflow

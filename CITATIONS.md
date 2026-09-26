@@ -1,8 +1,8 @@
 # aCaMEL/admixpipe: Citations
 
-## [aCaMEL/admixpipe](https://github.com/aCaMEL/admixpipe)
+## [aCaMEL/admixpipe](https://github.com/UARK-aCaMEL/admixpipe)
 
-> Chafin TK. aCaMEL/admixpipe. doi: 10.5281/zenodo.XXXXXXX
+> Chafin TK, Mussmann SM, Douglas MR, Douglas ME. aCaMEL/admixpipe. doi: 10.5281/zenodo.XXXXXXX
 
 ## [nf-core](https://pubmed.ncbi.nlm.nih.gov/32055031/)
 
